@@ -3,6 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/License-PolyForm--Noncommercial%201.0.0-blueviolet.svg)
 ![GitHub last commit](https://img.shields.io/github/last-commit/iishong0w0/Axiom-AI)
+![Repo Size](https://img.shields.io/github/repo-size/iishong0w0/Axiom-AI)
 
 A high-performance AI-powered gaming assistant built with Python and ONNX, featuring a real-time visual overlay and a highly customizable GUI.
 
