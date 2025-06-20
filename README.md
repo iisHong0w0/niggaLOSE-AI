@@ -20,7 +20,7 @@ A high-performance AI-powered gaming assistant built with Python and ONNX, featu
 
 **All users should obtain the latest version from the official link below.**
 
-### [**>> Download the Latest Release <<**](https://iishong0w0.github.io/niggalose/)
+### [**>> Download the Latest Release <<**](https://github.com/iisHong0w0/Axiom-AI/releases/tag/v1.0)
 
 ---
 
@@ -42,7 +42,7 @@ A high-performance AI-powered gaming assistant built with Python and ONNX, featu
 
 ## 🛠️ Installation & Usage
 
-1.  Navigate to the page linked above.
+1.  Navigate to the [**Releases**](https://github.com/iishong0w0/Axiom-AI/releases) page linked above.
 2.  Download the latest release package (`.zip`).
 3.  Extract the package to a new folder.
 4.  **(First-Time Use)** If you don't have Python installed, place the official Python installer (e.g., `python-3.13.4.exe`) in the same folder as `啟動.bat`.
