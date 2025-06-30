@@ -145,7 +145,7 @@ Contributions in any form are welcome, including bug reports, feature requests, 
 ---
 
 ## 📞 Contact
-
+*   **Discord**:https://discord.gg/h4dEh3b8Bt
 *   **GitHub**: [iishong0w0](https://github.com/iishong0w0)
 *   **Email**: iis20160512@gmail.com
 
