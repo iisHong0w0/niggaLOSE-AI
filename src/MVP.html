@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donate AXIOM</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            overflow: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            color: #333;
+            padding: 15px 25px;
+            border-bottom: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .lang-switch {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+        .lang-switch:hover {
+            background-color: #0056b3;
+        }
+        .charity-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .charity-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .charity-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .charity-card .emoji {
+            font-size: 3.5em;
+            margin-bottom: 15px;
+        }
+        .charity-card h2 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #0056b3;
+        }
+        .charity-card p {
+            font-size: 1em;
+            color: #666;
+            min-height: 80px; /* Ensures cards have a similar height */
+        }
+        .donate-button {
+            display: inline-block;
+            background: #28a745;
+            color: #fff;
+            padding: 12px 25px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-weight: bold;
+            transition: background 0.3s ease;
+        }
+        .donate-button:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1 id="title">Donate to Charitable Organizations</h1>
+            <button class="lang-switch" onclick="toggleLanguage()" id="langBtn">中文</button>
+        </div>
+
+        <div class="charity-grid" id="charity-grid">
+            </div>
+    </div>
+
+    <script>
+        const charities = [
+            {
+                name_en: "Doctors Without Borders",
+                name_zh: "無國界醫生",
+                emoji: "⚕️",
+                url: "https://www.doctorswithoutborders.org/",
+                description_en: "Provides humanitarian medical care in conflict zones and in countries affected by endemic diseases.",
+                description_zh: "在衝突地區和受地方性疾病影響的國家提供人道醫療護理。"
+            },
+            {
+                name_en: "FOS",
+                name_zh: "地球之友",
+                emoji: "🕊️",
+                url: "https://www.fos.ngo/agenda/demonstratie-voor-een-staakt-het-vuren/",
+                description_en: "Advocates for global justice and solidarity, campaigning for a ceasefire.",
+                description_zh: "倡導全球正義與團結，為停火而奔走。"
+            },
+            {
+                name_en: "Action Against Hunger",
+                name_zh: "反飢餓行動",
+                emoji: "🍽️",
+                url: "https://www.actionagainsthunger.org/",
+                description_en: "A global humanitarian organization that takes decisive action against the causes and effects of hunger.",
+                description_zh: "一個全球性的人道主義組織，致力於對飢餓的因果採取果斷行動。"
+            },
+            {
+                name_en: "Médecins Sans Frontières",
+                name_zh: "無國界醫生 (法國)",
+                emoji: "🩺",
+                url: "https://www.msf.fr/agir/soutenir-nos-actions",
+                description_en: "The French section of Doctors Without Borders, providing medical aid worldwide.",
+                description_zh: "無國界醫生的法國分部，在全球範圍內提供醫療援助。"
+            },
+            {
+                name_en: "Human Appeal",
+                name_zh: "人道呼籲",
+                emoji: "🤝",
+                url: "https://humanappealusa.org/appeals/zakat-and-nisab",
+                description_en: "Strengthens humanity’s fight against poverty, social injustice and natural disaster.",
+                description_zh: "努力加強人類對抗貧困、社會不公和自然災害的力量。"
+            },
+            {
+                name_en: "Red Cross",
+                name_zh: "紅十字會",
+                emoji: "❤️",
+                url: "https://www.redcross.org/donate/donation.html",
+                description_en: "A humanitarian organization that provides emergency assistance, disaster relief, and disaster preparedness education.",
+                description_zh: "一個人道組織，提供緊急援助、災害救援和備災教育。"
+            },
+            {
+                name_en: "Taiwan Fund for Children and Families",
+                name_zh: "家扶基金會",
+                emoji: "👨‍👩‍👧‍👦",
+                url: "https://donate.ccf.org.tw/",
+                description_en: "An international non-governmental organization that provides assistance to needy children and their families.",
+                description_zh: "一個為貧困兒童及其家庭提供援助的國際非政府組織。"
+            },
+            {
+                name_en: "One Foundation",
+                name_zh: "壹基金",
+                emoji: "💖",
+                url: "https://www.onefoundation.cn/",
+                description_en: "Focuses on disaster relief, children's welfare, and public welfare professional training.",
+                description_zh: "專注於災害救援、兒童福利和公益專業培訓的非政府組織。"
+            },
+            {
+                name_en: "United Nations Foundation",
+                name_zh: "聯合國基金會",
+                emoji: "🌐",
+                url: "https://unfoundation.org/",
+                description_en: "A charitable organization that supports the United Nations' initiatives and activities.",
+                description_zh: "一個支持聯合國倡議和活動的慈善組織。"
+            }
+        ];
+
+        let currentLanguage = 'en';
+
+        function renderCharities() {
+            const grid = document.getElementById('charity-grid');
+            grid.innerHTML = '';
+            charities.forEach(charity => {
+                const card = document.createElement('div');
+                card.className = 'charity-card';
+                card.innerHTML = `
+                    <div class="emoji">${charity.emoji}</div>
+                    <h2>${currentLanguage === 'en' ? charity.name_en : charity.name_zh}</h2>
+                    <p>${currentLanguage === 'en' ? charity.description_en : charity.description_zh}</p>
+                    <a href="${charity.url}" target="_blank" class="donate-button">${currentLanguage === 'en' ? 'Donate Now' : '立即捐款'}</a>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function toggleLanguage() {
+            currentLanguage = currentLanguage === 'en' ? 'zh' : 'en';
+            document.getElementById('title').innerText = currentLanguage === 'en' ? 'Donate to Charitable Organizations' : '捐款給慈善機構';
+            document.getElementById('langBtn').innerText = currentLanguage === 'en' ? '中文' : 'English';
+            renderCharities();
+        }
+
+        // Render the cards on initial page load
+        window.onload = renderCharities;
+    </script>
+</body>
+</html>
