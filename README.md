@@ -126,6 +126,7 @@ The new UI layout is divided into six main sections:
 ├── python-3.13.5-amd64.exe
 ├── requirements.txt
 
+```
 ### Contributing
 Contributions in any form are welcome, including bug reports, feature requests, or direct pull requests.
 
