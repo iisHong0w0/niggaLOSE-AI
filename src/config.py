@@ -40,6 +40,15 @@ class Config:
         self.min_confidence = 0.66
         self.aim_part = "head"
         
+        # ***** 新增：單目標模式 *****
+        self.single_target_mode = True  # 一次最多檢測一個離準心最近的敵人
+        
+        # ***** 新增：音效提示系統 *****
+        self.enable_sound_alert = True  # 啟用音效提示
+        self.sound_frequency = 1000     # 音效頻率 (Hz)
+        self.sound_duration = 100       # 音效持續時間 (ms)
+        self.sound_interval = 200       # 音效間隔 (ms)
+        
         # 頭部和身體區域占比設定
         self.head_width_ratio = 0.38    # 頭部寬度占檢測框寬度的比例
         self.head_height_ratio = 0.26   # 頭部高度占檢測框高度的比例
@@ -114,6 +123,7 @@ def save_config(config_instance):
         'show_fov': getattr(config_instance, 'show_fov', True),
         'show_boxes': getattr(config_instance, 'show_boxes', True),
         'show_status_panel': getattr(config_instance, 'show_status_panel', True), # ***** 新增此行 *****
+        'single_target_mode': getattr(config_instance, 'single_target_mode', True), # ***** 新增：單目標模式 *****
         
         # 頭部和身體區域占比設定
         'head_width_ratio': getattr(config_instance, 'head_width_ratio', 0.38),
@@ -123,6 +133,12 @@ def save_config(config_instance):
         # 優化：性能相關設置
         'performance_mode': getattr(config_instance, 'performance_mode', False),
         'max_queue_size': getattr(config_instance, 'max_queue_size', 3),
+        
+        # ***** 新增：音效提示系統 *****
+        'enable_sound_alert': getattr(config_instance, 'enable_sound_alert', True),
+        'sound_frequency': getattr(config_instance, 'sound_frequency', 1000),
+        'sound_duration': getattr(config_instance, 'sound_duration', 100),
+        'sound_interval': getattr(config_instance, 'sound_interval', 200),
     }
     try:
         with open('config.json', 'w', encoding='utf-8') as f:

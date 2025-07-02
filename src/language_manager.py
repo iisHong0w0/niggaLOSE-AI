@@ -19,6 +19,7 @@ class LanguageManager:
                 "fov_size": "FOV大小",
                 "min_confidence": "檢測最低概率(%)",
                 "detect_interval": "檢測間隔(ms)",
+                "single_target_mode": "單目標模式 (一次最多鎖定一個最近的敵人)",
                 
                 # PID 控制
                 "aim_speed_pid": "瞄準速度 (PID)",
@@ -46,6 +47,13 @@ class LanguageManager:
                 "fov_follow_mouse": "FOV跟隨鼠標",
                 "enable_anti_recoil": "啟用防後座力 (自動關閉FOV跟隨)",
                 "anti_recoil_speed": "防後座力速度",
+                
+                # ***** 新增：音效提示系統 *****
+                "sound_alert_system": "音效提示系統",
+                "enable_sound_alert": "啟用音效提示 (準心在敵人框內時)",
+                "sound_frequency": "音效頻率 (Hz)",
+                "sound_duration": "音效持續時間 (ms)",
+                "sound_interval": "音效間隔 (ms)",
                 
                 # 按鍵與自動開火
                 "keys_and_auto_fire": "按鍵與自動開火",
@@ -75,7 +83,8 @@ class LanguageManager:
                 "tab_keys": "按鍵設定",
                 "tab_auto_features": "自動功能",
                 "tab_display": "顯示選項",
-                "tab_program": "程式控制",
+                "tab_program_control": "程式控制",
+                "tab_preset_management": "參數管理",
                 
                 # 關於視窗
                 "about": "關於",
@@ -135,7 +144,29 @@ class LanguageManager:
 - 如果 100% 太小，建議使用較大解析度的顯示器
 - 設定完成後可能需要調整其他軟體的視窗大小
 - 這是為了確保程序的準確性和最佳效能""",
-                "scaling_close_button": "我知道了，關閉程序"
+                "scaling_close_button": "我知道了，關閉程序",
+                
+                # ***** 新增：參數管理系統 *****
+                "preset_manager": "參數管理",
+                "preset_config": "參數配置",
+                "parameter_name": "參數名稱",
+                "no_selection": "未選中",
+                "create_preset": "新建參數",
+                "rename_preset": "重新命名", 
+                "load_preset": "載入參數",
+                "save_preset": "保存參數",
+                "refresh_preset": "刷新參數",
+                "delete_preset": "刪除參數",
+                "open_preset_folder": "打開參數文件夾",
+                "import_preset": "匯入參數",
+                "export_preset": "匯出參數",
+                "preset_success": "成功",
+                "preset_error": "錯誤",
+                "preset_warning": "警告",
+                "confirm_delete": "確認刪除",
+                "confirm_overwrite": "確認覆蓋",
+                "preset_management_features": "參數管理功能",
+                "open_preset_manager": "打開參數管理器",
             },
             
             "en": {
@@ -154,6 +185,7 @@ class LanguageManager:
                 "fov_size": "FOV Size",
                 "min_confidence": "Min Confidence (%)",
                 "detect_interval": "Detection Interval (ms)",
+                "single_target_mode": "Single Target Mode (Lock on the nearest enemy at a time)",
                 
                 # PID control
                 "aim_speed_pid": "Aim Speed (PID)",
@@ -181,6 +213,13 @@ class LanguageManager:
                 "fov_follow_mouse": "FOV Follow Mouse",
                 "enable_anti_recoil": "Enable Anti-Recoil (Auto Disable FOV Follow)",
                 "anti_recoil_speed": "Anti-Recoil Speed",
+                
+                # ***** 新增：音效提示系統 *****
+                "sound_alert_system": "Sound Alert System",
+                "enable_sound_alert": "Enable Sound Alert (When Aiming at Enemy)",
+                "sound_frequency": "Sound Frequency (Hz)",
+                "sound_duration": "Sound Duration (ms)",
+                "sound_interval": "Sound Interval (ms)",
                 
                 # Keys and auto fire
                 "keys_and_auto_fire": "Keys & Auto Fire",
@@ -210,7 +249,8 @@ class LanguageManager:
                 "tab_keys": "Key Settings",
                 "tab_auto_features": "Auto Features",
                 "tab_display": "Display Options",
-                "tab_program": "Program Control",
+                "tab_program_control": "Program Control",
+                "tab_preset_management": "Preset Management",
                 
                 # About window
                 "about": "About",
@@ -270,7 +310,29 @@ class LanguageManager:
 - If 100% is too small, consider using a higher resolution monitor
 - You may need to adjust other software window sizes after setting
 - This ensures program accuracy and optimal performance""",
-                "scaling_close_button": "Understood, Close Program"
+                "scaling_close_button": "Understood, Close Program",
+                
+                # ***** 新增：配置預設管理系統 *****
+                "preset_manager": "Preset Manager",
+                "preset_config": "Preset Configuration",
+                "parameter_name": "Parameter Name",
+                "no_selection": "No Selection",
+                "create_preset": "Create Preset",
+                "rename_preset": "Rename Preset", 
+                "load_preset": "Load Preset",
+                "save_preset": "Save Preset",
+                "refresh_preset": "Refresh Preset",
+                "delete_preset": "Delete Preset",
+                "open_preset_folder": "Open Preset Folder",
+                "import_preset": "Import Preset",
+                "export_preset": "Export Preset",
+                "preset_success": "Success",
+                "preset_error": "Error",
+                "preset_warning": "Warning",
+                "confirm_delete": "Confirm Delete",
+                "confirm_overwrite": "Confirm Overwrite",
+                "preset_management_features": "Preset Management Features",
+                "open_preset_manager": "Open Preset Manager",
             }
         }
         

@@ -7,12 +7,14 @@ import win32api
 import glob
 import math
 from typing import Union
+import tkinter.messagebox as messagebox
 
 # 從我們自己建立的模組中導入
 from win_utils import VK_CODE_MAP, get_vk_name
 from config import save_config
 from language_manager import language_manager, get_text  # 新增導入
 from about import show_about_window  # 導入關於視窗
+from preset_manager import PresetManagerGUI  # ***** 新增：導入預設管理器 *****
 
 # PIL 兼容性處理
 try:
@@ -201,6 +203,7 @@ class SettingsWindow:
         self.create_keys_settings_tab(main_notebook)
         self.create_auto_features_tab(main_notebook)
         self.create_display_options_tab(main_notebook)
+        self.create_preset_management_tab(main_notebook)  # ***** 新增：預設管理分頁 *****
         self.create_program_control_tab(main_notebook)
 
         self.listening_for_slot = None
@@ -247,9 +250,21 @@ class SettingsWindow:
         params_frame = create_section_frame(tab, get_text("general_params"))
         params_frame.pack(fill="x", pady=(0, 15))
         
-        self.create_slider(params_frame, get_text("fov_size"), self.config.fov_size, 50, min(self.config.width, self.config.height), self.fov_size_configurator)
-        self.create_slider(params_frame, get_text("min_confidence"), self.config.min_confidence * 100, 0, 100, self.min_confidence_configurator)
-        self.create_slider(params_frame, get_text("detect_interval"), self.config.detect_interval * 1000, 1, 100, self.detect_interval_configurator)
+        self.fov_size_slider = self.create_slider(params_frame, get_text("fov_size"), self.config.fov_size, 50, min(self.config.width, self.config.height), self.fov_size_configurator, slider_name="fov_size")
+        self.min_confidence_slider = self.create_slider(params_frame, get_text("min_confidence"), self.config.min_confidence * 100, 0, 100, self.min_confidence_configurator, slider_name="min_confidence")
+        self.detect_interval_slider = self.create_slider(params_frame, get_text("detect_interval"), self.config.detect_interval * 1000, 1, 100, self.detect_interval_configurator, slider_name="detect_interval")
+        
+        # ***** 新增：單目標模式設定 *****
+        self.single_target_var = tk.BooleanVar(value=getattr(self.config, 'single_target_mode', True))
+        single_target_checkbox = tk.Checkbutton(params_frame, 
+                                               text=get_text("single_target_mode"), 
+                                               variable=self.single_target_var, 
+                                               command=self.toggle_single_target_mode, 
+                                               bg=self.bg_frame, 
+                                               fg=self.fg_text, 
+                                               selectcolor=self.bg_main, 
+                                               font=("Arial", 10))
+        single_target_checkbox.pack(anchor="w", pady=(5, 0))
     
     def create_aim_control_tab(self, notebook):
         """建立瞄準控制分頁"""
@@ -280,13 +295,13 @@ class SettingsWindow:
         pid_tabs.add(tab_y, text=get_text("vertical_y"))
         pid_tabs.pack(expand=True, fill="both")
         
-        self.create_slider(tab_x, get_text("reaction_speed_p"), self.config.pid_kp_x, 0, 1, self.pid_kp_x_configurator, res=0.001, val_format=".3f", length=400)
-        self.create_slider(tab_x, get_text("error_correction_i"), self.config.pid_ki_x, 0, 0.1, self.pid_ki_x_configurator, res=0.001, val_format=".3f", length=400)
-        self.create_slider(tab_x, get_text("stability_suppression_d"), self.config.pid_kd_x, 0, 0.2, self.pid_kd_x_configurator, res=0.001, val_format=".3f", length=400)
+        self.pid_kp_x_slider = self.create_slider(tab_x, get_text("reaction_speed_p"), self.config.pid_kp_x, 0, 1, self.pid_kp_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kp_x")
+        self.pid_ki_x_slider = self.create_slider(tab_x, get_text("error_correction_i"), self.config.pid_ki_x, 0, 0.1, self.pid_ki_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_ki_x")
+        self.pid_kd_x_slider = self.create_slider(tab_x, get_text("stability_suppression_d"), self.config.pid_kd_x, 0, 0.2, self.pid_kd_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kd_x")
 
-        self.create_slider(tab_y, get_text("reaction_speed_p"), self.config.pid_kp_y, 0, 1, self.pid_kp_y_configurator, res=0.001, val_format=".3f", length=400)
-        self.create_slider(tab_y, get_text("error_correction_i"), self.config.pid_ki_y, 0, 0.1, self.pid_ki_y_configurator, res=0.001, val_format=".3f", length=400)
-        self.create_slider(tab_y, get_text("stability_suppression_d"), self.config.pid_kd_y, 0, 0.2, self.pid_kd_y_configurator, res=0.001, val_format=".3f", length=400)
+        self.pid_kp_y_slider = self.create_slider(tab_y, get_text("reaction_speed_p"), self.config.pid_kp_y, 0, 1, self.pid_kp_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kp_y")
+        self.pid_ki_y_slider = self.create_slider(tab_y, get_text("error_correction_i"), self.config.pid_ki_y, 0, 0.1, self.pid_ki_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_ki_y")
+        self.pid_kd_y_slider = self.create_slider(tab_y, get_text("stability_suppression_d"), self.config.pid_kd_y, 0, 0.2, self.pid_kd_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kd_y")
         
         # 瞄準部位設定
         aim_frame = create_section_frame(tab, get_text("aim_part"))
@@ -322,12 +337,12 @@ class SettingsWindow:
         
         # 頭部設定
         tk.Label(area_left, text="頭部區域:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        self.create_slider(area_left, get_text("head_width_ratio"), self.config.head_width_ratio * 100, 10, 100, self.head_width_ratio_configurator, res=1, val_format=".0f")
-        self.create_slider(area_left, get_text("head_height_ratio"), self.config.head_height_ratio * 100, 10, 50, self.head_height_ratio_configurator, res=1, val_format=".0f")
+        self.head_width_ratio_slider = self.create_slider(area_left, get_text("head_width_ratio"), self.config.head_width_ratio * 100, 10, 100, self.head_width_ratio_configurator, res=1, val_format=".0f")
+        self.head_height_ratio_slider = self.create_slider(area_left, get_text("head_height_ratio"), self.config.head_height_ratio * 100, 10, 50, self.head_height_ratio_configurator, res=1, val_format=".0f")
         
         # 身體設定
         tk.Label(area_right, text="身體區域:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        self.create_slider(area_right, get_text("body_width_ratio"), self.config.body_width_ratio * 100, 50, 100, self.body_width_ratio_configurator, res=1, val_format=".0f")
+        self.body_width_ratio_slider = self.create_slider(area_right, get_text("body_width_ratio"), self.config.body_width_ratio * 100, 50, 100, self.body_width_ratio_configurator, res=1, val_format=".0f")
         
         # 添加說明文字
         tk.Label(area_right, text="※ 身體高度 = 100% - 頭部高度", bg=self.bg_frame, fg="#888888", font=("Arial", 8)).pack(anchor="w", pady=(5, 0))
@@ -402,8 +417,8 @@ class SettingsWindow:
         ttk.Combobox(autofire_frame, textvariable=self.AutoFirePartVar, values=[get_text("head"), get_text("body"), get_text("both")], state="readonly", width=15).pack(anchor="w", pady=(0,10))
         self.AutoFirePartVar.trace_add("write", self.auto_fire_part_changed)
 
-        self.create_slider(autofire_frame, get_text("scope_delay"), self.config.auto_fire_delay, 0, 1, self.auto_fire_delay_configurator, res=0.01, val_format=".2f")
-        self.create_slider(autofire_frame, get_text("fire_interval"), self.config.auto_fire_interval, 0, 1, self.auto_fire_interval_configurator, res=0.01, val_format=".2f")
+        self.auto_fire_delay_slider = self.create_slider(autofire_frame, get_text("scope_delay"), self.config.auto_fire_delay, 0, 1, self.auto_fire_delay_configurator, res=0.01, val_format=".2f")
+        self.auto_fire_interval_slider = self.create_slider(autofire_frame, get_text("fire_interval"), self.config.auto_fire_interval, 0, 1, self.auto_fire_interval_configurator, res=0.01, val_format=".2f")
         
         # 防後座力設定
         recoil_frame = create_section_frame(tab, get_text("enable_anti_recoil"))
@@ -412,7 +427,7 @@ class SettingsWindow:
         self.enable_anti_recoil_var = tk.BooleanVar(value=self.config.enable_anti_recoil)
         tk.Checkbutton(recoil_frame, text=get_text("enable_anti_recoil"), variable=self.enable_anti_recoil_var, command=self.toggle_anti_recoil, bg=self.bg_frame, fg=self.fg_text, selectcolor=self.bg_main, font=("Arial", 10)).pack(anchor="w", pady=(0, 10))
         
-        self.create_slider(recoil_frame, get_text("anti_recoil_speed"), self.config.anti_recoil_speed, 0, 10, self.anti_recoil_speed_configurator, res=0.1, val_format=".1f")
+        self.anti_recoil_speed_slider = self.create_slider(recoil_frame, get_text("anti_recoil_speed"), self.config.anti_recoil_speed, 0, 10, self.anti_recoil_speed_configurator, res=0.1, val_format=".1f")
 
     def create_display_options_tab(self, notebook):
         """建立顯示選項分頁"""
@@ -443,10 +458,173 @@ class SettingsWindow:
         self.fov_follow_mouse_checkbox = tk.Checkbutton(options_frame, text=get_text("fov_follow_mouse"), variable=self.fov_follow_mouse_var, command=self.toggle_fov_follow_mouse, bg=self.bg_frame, fg=self.fg_text, selectcolor=self.bg_main, font=("Arial", 10))
         self.fov_follow_mouse_checkbox.pack(anchor="w", pady=5)
 
+        # ***** 新增：音效提示系統設定 *****
+        sound_frame = create_section_frame(tab, get_text("sound_alert_system"))
+        sound_frame.pack(fill="x", pady=(15, 0))
+        
+        # 啟用音效提示復選框
+        self.enable_sound_alert_var = tk.BooleanVar(value=getattr(self.config, 'enable_sound_alert', True))
+        tk.Checkbutton(sound_frame, 
+                      text=get_text("enable_sound_alert"), 
+                      variable=self.enable_sound_alert_var, 
+                      command=self.toggle_sound_alert, 
+                      bg=self.bg_frame, 
+                      fg=self.fg_text, 
+                      selectcolor=self.bg_main, 
+                      font=("Arial", 10)).pack(anchor="w", pady=(0, 10))
+        
+        # 音效參數滑條
+        self.sound_frequency_slider = self.create_slider(sound_frame, get_text("sound_frequency"), getattr(self.config, 'sound_frequency', 1000), 400, 2000, self.sound_frequency_configurator, res=50, val_format=".0f")
+        self.sound_duration_slider = self.create_slider(sound_frame, get_text("sound_duration"), getattr(self.config, 'sound_duration', 100), 50, 500, self.sound_duration_configurator, res=10, val_format=".0f")
+        self.sound_interval_slider = self.create_slider(sound_frame, get_text("sound_interval"), getattr(self.config, 'sound_interval', 200), 100, 1000, self.sound_interval_configurator, res=50, val_format=".0f")
+
+    def create_preset_management_tab(self, notebook):
+        """建立預設管理分頁"""
+        tab = tk.Frame(notebook, bg=self.bg_main, padx=20, pady=15)
+        notebook.add(tab, text=get_text("tab_preset_management"))
+        
+        # 初始化預設管理器
+        from preset_manager import PresetManager
+        self.preset_manager = PresetManager()
+        
+        def create_section_frame(parent, title):
+            return tk.LabelFrame(parent, text=title, font=("Arial", 11, "bold"), 
+                                 bg=self.bg_frame, fg=self.fg_text, bd=2, relief="groove",
+                                 labelanchor="n", padx=15, pady=10)
+        
+        # 主要容器，使用左右分佈
+        main_container = tk.Frame(tab, bg=self.bg_main)
+        main_container.pack(fill="both", expand=True)
+        
+        # 左側：預設列表
+        left_frame = create_section_frame(main_container, get_text("preset_config"))
+        left_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        # 預設列表框架
+        list_container = tk.Frame(left_frame, bg=self.bg_frame)
+        list_container.pack(fill="both", expand=True)
+        
+        # 預設列表框架
+        listbox_frame = tk.Frame(list_container, bg=self.bg_frame)
+        listbox_frame.pack(fill="both", expand=True, pady=(0, 10))
+        
+        # 預設列表
+        self.preset_listbox = tk.Listbox(listbox_frame, 
+                                        bg="#2a0a2a", 
+                                        fg="white", 
+                                        selectbackground="#4a2a4a", 
+                                        selectforeground="white",
+                                        font=("Arial", 11),
+                                        height=15)
+        self.preset_listbox.pack(side="left", fill="both", expand=True)
+        
+        # 滾動條
+        scrollbar = tk.Scrollbar(listbox_frame, orient="vertical")
+        scrollbar.pack(side="right", fill="y")
+        self.preset_listbox.config(yscrollcommand=scrollbar.set)
+        scrollbar.config(command=self.preset_listbox.yview)
+        
+        # 當前選中顯示
+        self.selected_preset_label = tk.Label(list_container, 
+                                             text=f"{get_text('parameter_name')}：{get_text('no_selection')}", 
+                                             bg=self.bg_frame, 
+                                             fg="#cccccc", 
+                                             font=("Arial", 9))
+        self.selected_preset_label.pack(anchor="w", pady=(5, 0))
+        
+        # 右側：控制按鈕
+        right_frame = create_section_frame(main_container, "管理功能")
+        right_frame.pack(side="right", fill="y", padx=(10, 0))
+        
+        # 按鈕樣式
+        button_style = {
+            "bg": "#4a2a4a",
+            "fg": "white",
+            "activebackground": "#6a4a6a",
+            "activeforeground": "white",
+            "font": ("Arial", 9, "bold"),
+            "width": 12,
+            "height": 2,
+            "relief": "raised",
+            "bd": 2
+        }
+        
+        # 第一行按鈕
+        row1_frame = tk.Frame(right_frame, bg=self.bg_frame)
+        row1_frame.pack(pady=(10, 5))
+        
+        tk.Button(row1_frame, text=get_text("create_preset"), 
+                 command=self.create_new_preset_tab, 
+                 **button_style).pack(side="left", padx=2)
+        tk.Button(row1_frame, text=get_text("rename_preset"), 
+                 command=self.rename_preset_tab, 
+                 **button_style).pack(side="left", padx=2)
+        
+        # 第二行按鈕
+        row2_frame = tk.Frame(right_frame, bg=self.bg_frame)
+        row2_frame.pack(pady=5)
+        
+        tk.Button(row2_frame, text=get_text("load_preset"), 
+                 command=self.load_preset_tab, 
+                 **button_style).pack(side="left", padx=2)
+        tk.Button(row2_frame, text=get_text("save_preset"), 
+                 command=self.save_preset_tab, 
+                 **button_style).pack(side="left", padx=2)
+        
+        # 第三行按鈕
+        row3_frame = tk.Frame(right_frame, bg=self.bg_frame)
+        row3_frame.pack(pady=5)
+        
+        tk.Button(row3_frame, text=get_text("refresh_preset"), 
+                 command=self.refresh_preset_list_tab, 
+                 **button_style).pack(side="left", padx=2)
+        tk.Button(row3_frame, text=get_text("delete_preset"), 
+                 command=self.delete_preset_tab, 
+                 **button_style).pack(side="left", padx=2)
+        
+        # 第四行按鈕（文件操作）
+        row4_frame = tk.Frame(right_frame, bg=self.bg_frame)
+        row4_frame.pack(pady=(15, 5))
+        
+        tk.Button(row4_frame, text=get_text("open_preset_folder"), 
+                 command=self.open_presets_folder_tab, 
+                 bg="#2a4a2a", fg="white", activebackground="#4a6a4a", 
+                 font=("Arial", 9, "bold"), width=25, height=1).pack()
+        
+        # 第五行按鈕（匯入匯出）
+        row5_frame = tk.Frame(right_frame, bg=self.bg_frame)
+        row5_frame.pack(pady=5)
+        
+        tk.Button(row5_frame, text=get_text("import_preset"), 
+                 command=self.import_preset_tab, 
+                 **button_style).pack(side="left", padx=2)
+        tk.Button(row5_frame, text=get_text("export_preset"), 
+                 command=self.export_preset_tab, 
+                 **button_style).pack(side="left", padx=2)
+        
+        # 底部說明
+        info_frame = tk.Frame(right_frame, bg=self.bg_frame)
+        info_frame.pack(pady=(20, 0), fill="x")
+        
+        info_text = "💡 使用說明：\n" \
+                   "1. 選擇預設配置\n" \
+                   "2. 點擊載入參數\n" \
+                   "3. 設定自動應用"
+        
+        tk.Label(info_frame, text=info_text, 
+                bg=self.bg_frame, fg="#888888", 
+                font=("Arial", 8), justify="left").pack(anchor="w")
+        
+        # 綁定列表選擇事件
+        self.preset_listbox.bind('<<ListboxSelect>>', self.on_preset_select_tab)
+        
+        # 初始化列表
+        self.refresh_preset_list_tab()
+
     def create_program_control_tab(self, notebook):
         """建立程式控制分頁"""
         tab = tk.Frame(notebook, bg=self.bg_main, padx=20, pady=15)
-        notebook.add(tab, text=get_text("tab_program"))
+        notebook.add(tab, text=get_text("tab_program_control"))
         
         def create_section_frame(parent, title):
             return tk.LabelFrame(parent, text=title, font=("Arial", 11, "bold"), 
@@ -472,7 +650,7 @@ class SettingsWindow:
         tk.Button(btn_container, text=get_text("about"), command=self.show_about, bg="#4CAF50", fg="white", activebackground="#45a049", font=("Arial", 10), width=12, height=2).pack(side="left", padx=8)
         tk.Button(btn_container, text=get_text("exit_and_save"), command=self.quit_program, bg=self.btn_bg, fg=self.fg_text, activebackground=self.btn_active, font=("Arial", 10), width=12, height=2).pack(side="left", padx=8)
 
-    def create_slider(self, parent, text, default_val, from_, to, command, res: Union[int, float] = 1, val_format="", length=200):
+    def create_slider(self, parent, text, default_val, from_, to, command, res: Union[int, float] = 1, val_format="", length=200, slider_name=""):
         frame = tk.Frame(parent, bg=parent.cget("bg"))
         frame.pack(fill="x", pady=2)
         
@@ -546,6 +724,8 @@ class SettingsWindow:
         scale.set(default_val)
         scale.pack(fill="x")
 
+        return scale
+
     def quit_program(self):
         self.config.Running = False
         save_config(self.config)
@@ -576,6 +756,11 @@ class SettingsWindow:
     def head_width_ratio_configurator(self, v): self.config.head_width_ratio = float(v) / 100.0
     def head_height_ratio_configurator(self, v): self.config.head_height_ratio = float(v) / 100.0
     def body_width_ratio_configurator(self, v): self.config.body_width_ratio = float(v) / 100.0
+    
+    # ***** 新增：音效提示系統配置方法 *****
+    def sound_frequency_configurator(self, v): self.config.sound_frequency = int(v)
+    def sound_duration_configurator(self, v): self.config.sound_duration = int(v)  
+    def sound_interval_configurator(self, v): self.config.sound_interval = int(v)
     
     def toggle_aim(self):
         self.config.AimToggle = not self.config.AimToggle
@@ -702,7 +887,7 @@ class SettingsWindow:
         """重新啟動GUI以應用新語言"""
         save_config(self.config)
         self.master.destroy()
-        from settings_gui import create_settings_gui
+        # 避免循環導入，直接調用模組級別的函數
         create_settings_gui(self.config, self.start_ai_threads)
 
     def update_status_labels(self):
@@ -718,6 +903,289 @@ class SettingsWindow:
     def show_about(self):
         """顯示關於視窗"""
         show_about_window(self.master)
+
+    def toggle_single_target_mode(self):
+        self.config.single_target_mode = self.single_target_var.get()
+
+    def toggle_sound_alert(self):
+        """切換音效提示"""
+        self.config.enable_sound_alert = self.enable_sound_alert_var.get()
+
+    def open_preset_manager(self):
+        """打開預設管理器（向後兼容）"""
+        # 這個方法保留是為了向後兼容，但現在會切換到預設管理標籤頁
+        messagebox.showinfo("提示", "預設管理功能現在已整合到「預設管理」標籤頁中！")
+    
+    def update_gui_from_preset(self):
+        """從預設配置更新GUI顯示"""
+        try:
+            print("開始更新GUI...")
+            
+            # 更新模型選擇
+            if hasattr(self, 'model_var'):
+                model_name = os.path.basename(self.config.model_path)
+                self.model_var.set(model_name)
+                print(f"已更新模型: {model_name}")
+            
+            # 更新滑條值 - 需要觸發更新事件
+            # FOV大小
+            if hasattr(self, 'fov_size_slider'):
+                self.fov_size_slider.set(self.config.fov_size)
+            
+            # 最小置信度
+            if hasattr(self, 'min_confidence_slider'):
+                self.min_confidence_slider.set(self.config.min_confidence * 100)
+            
+            # 檢測間隔
+            if hasattr(self, 'detect_interval_slider'):
+                self.detect_interval_slider.set(self.config.detect_interval * 1000)
+            
+            # PID 參數
+            if hasattr(self, 'pid_kp_x_slider'):
+                self.pid_kp_x_slider.set(self.config.pid_kp_x)
+            if hasattr(self, 'pid_ki_x_slider'):
+                self.pid_ki_x_slider.set(self.config.pid_ki_x)
+            if hasattr(self, 'pid_kd_x_slider'):
+                self.pid_kd_x_slider.set(self.config.pid_kd_x)
+            if hasattr(self, 'pid_kp_y_slider'):
+                self.pid_kp_y_slider.set(self.config.pid_kp_y)
+            if hasattr(self, 'pid_ki_y_slider'):
+                self.pid_ki_y_slider.set(self.config.pid_ki_y)
+            if hasattr(self, 'pid_kd_y_slider'):
+                self.pid_kd_y_slider.set(self.config.pid_kd_y)
+                
+            # 頭部和身體占比參數
+            if hasattr(self, 'head_width_ratio_slider'):
+                self.head_width_ratio_slider.set(getattr(self.config, 'head_width_ratio', 0.38) * 100)
+            if hasattr(self, 'head_height_ratio_slider'):
+                self.head_height_ratio_slider.set(getattr(self.config, 'head_height_ratio', 0.26) * 100)
+            if hasattr(self, 'body_width_ratio_slider'):
+                self.body_width_ratio_slider.set(getattr(self.config, 'body_width_ratio', 0.87) * 100)
+                
+            # 自動開火參數
+            if hasattr(self, 'auto_fire_delay_slider'):
+                self.auto_fire_delay_slider.set(getattr(self.config, 'auto_fire_delay', 0.0))
+            if hasattr(self, 'auto_fire_interval_slider'):
+                self.auto_fire_interval_slider.set(getattr(self.config, 'auto_fire_interval', 0.18))
+                
+            # 防後座力參數
+            if hasattr(self, 'anti_recoil_speed_slider'):
+                self.anti_recoil_speed_slider.set(getattr(self.config, 'anti_recoil_speed', 1.0))
+                
+            # 音效提示系統參數
+            if hasattr(self, 'sound_frequency_slider'):
+                self.sound_frequency_slider.set(getattr(self.config, 'sound_frequency', 1000))
+            if hasattr(self, 'sound_duration_slider'):
+                self.sound_duration_slider.set(getattr(self.config, 'sound_duration', 100))
+            if hasattr(self, 'sound_interval_slider'):
+                self.sound_interval_slider.set(getattr(self.config, 'sound_interval', 200))
+            
+            # 更新瞄準部位
+            if hasattr(self, 'AimPartVar'):
+                display_aim_part = self.config.aim_part
+                if self.config.aim_part == "head":
+                    display_aim_part = get_text("head")
+                elif self.config.aim_part == "body":
+                    display_aim_part = get_text("body")
+                self.AimPartVar.set(display_aim_part)
+                print(f"已更新瞄準部位: {display_aim_part}")
+            
+            # 更新自動開火部位
+            if hasattr(self, 'AutoFirePartVar'):
+                display_autofire_part = self.config.auto_fire_target_part
+                if self.config.auto_fire_target_part == "head":
+                    display_autofire_part = get_text("head")
+                elif self.config.auto_fire_target_part == "body":
+                    display_autofire_part = get_text("body")
+                elif self.config.auto_fire_target_part == "both":
+                    display_autofire_part = get_text("both")
+                self.AutoFirePartVar.set(display_autofire_part)
+                print(f"已更新自動開火部位: {display_autofire_part}")
+            
+            # 更新復選框狀態
+            if hasattr(self, 'show_confidence_var'):
+                self.show_confidence_var.set(self.config.show_confidence)
+            if hasattr(self, 'show_fov_var'):
+                self.show_fov_var.set(getattr(self.config, 'show_fov', True))
+            if hasattr(self, 'show_boxes_var'):
+                self.show_boxes_var.set(getattr(self.config, 'show_boxes', True))
+            if hasattr(self, 'keep_detecting_var'):
+                self.keep_detecting_var.set(getattr(self.config, 'keep_detecting', True))
+            if hasattr(self, 'fov_follow_mouse_var'):
+                self.fov_follow_mouse_var.set(getattr(self.config, 'fov_follow_mouse', False))
+            if hasattr(self, 'enable_anti_recoil_var'):
+                self.enable_anti_recoil_var.set(getattr(self.config, 'enable_anti_recoil', False))
+            if hasattr(self, 'single_target_var'):
+                self.single_target_var.set(getattr(self.config, 'single_target_mode', True))
+            if hasattr(self, 'enable_sound_alert_var'):
+                self.enable_sound_alert_var.set(getattr(self.config, 'enable_sound_alert', True))
+            
+            # 更新按鍵顯示
+            self.update_key_buttons()
+            
+            # 更新狀態標籤
+            if hasattr(self, 'update_status_labels'):
+                self.update_status_labels()
+            
+            # 如果有模型更改，重新載入模型
+            if hasattr(self, 'start_ai_threads') and self.start_ai_threads:
+                self.start_ai_threads(self.config.model_path)
+                
+            print("GUI 更新完成")
+            
+        except Exception as e:
+            print(f"更新GUI失敗: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # ***** 新增：預設管理標籤頁功能方法 *****
+    def refresh_preset_list_tab(self):
+        """刷新預設列表"""
+        if hasattr(self, 'preset_listbox'):
+            self.preset_listbox.delete(0, tk.END)
+            presets = self.preset_manager.get_preset_list()
+            for preset in presets:
+                self.preset_listbox.insert(tk.END, preset)
+    
+    def on_preset_select_tab(self, event):
+        """處理預設選擇事件"""
+        selection = self.preset_listbox.curselection()
+        if selection:
+            preset_name = self.preset_listbox.get(selection[0])
+            self.selected_preset_label.config(text=f"{get_text('parameter_name')}：{preset_name}")
+    
+    def get_selected_preset_tab(self):
+        """獲取當前選中的預設"""
+        if hasattr(self, 'preset_listbox'):
+            selection = self.preset_listbox.curselection()
+            if selection:
+                return self.preset_listbox.get(selection[0])
+        return None
+    
+    def create_new_preset_tab(self):
+        """創建新預設"""
+        import tkinter.simpledialog as simpledialog
+        name = simpledialog.askstring("新建預設", "請輸入預設名稱:")
+        if name:
+            if self.preset_manager.save_preset(self.config, name):
+                messagebox.showinfo("成功", f"預設 '{name}' 創建成功!")
+                self.refresh_preset_list_tab()
+            else:
+                messagebox.showerror("錯誤", "創建預設失敗!")
+    
+    def rename_preset_tab(self):
+        """重命名預設"""
+        import tkinter.simpledialog as simpledialog
+        old_name = self.get_selected_preset_tab()
+        if not old_name:
+            messagebox.showwarning("警告", "請先選擇一個預設!")
+            return
+        
+        new_name = simpledialog.askstring("重命名預設", f"重命名 '{old_name}' 為:", initialvalue=old_name)
+        if new_name and new_name != old_name:
+            if self.preset_manager.rename_preset(old_name, new_name):
+                messagebox.showinfo("成功", f"預設重命名為 '{new_name}' 成功!")
+                self.refresh_preset_list_tab()
+            else:
+                messagebox.showerror("錯誤", "重命名預設失敗!")
+    
+    def load_preset_tab(self):
+        """載入預設"""
+        preset_name = self.get_selected_preset_tab()
+        if not preset_name:
+            messagebox.showwarning("警告", "請先選擇一個預設!")
+            return
+        
+        if self.preset_manager.load_preset(self.config, preset_name):
+            self.update_gui_from_preset()
+            save_config(self.config)
+            messagebox.showinfo("成功", f"預設 '{preset_name}' 載入成功!\n所有設定已更新。")
+        else:
+            messagebox.showerror("錯誤", "載入預設失敗!")
+    
+    def save_preset_tab(self):
+        """保存當前配置為預設"""
+        preset_name = self.get_selected_preset_tab()
+        if not preset_name:
+            messagebox.showwarning("警告", "請先選擇一個預設或創建新預設!")
+            return
+        
+        result = messagebox.askyesno("確認", f"確定要用當前配置覆蓋預設 '{preset_name}' 嗎?")
+        if result:
+            if self.preset_manager.save_preset(self.config, preset_name):
+                messagebox.showinfo("成功", f"預設 '{preset_name}' 保存成功!")
+            else:
+                messagebox.showerror("錯誤", "保存預設失敗!")
+    
+    def delete_preset_tab(self):
+        """刪除預設"""
+        preset_name = self.get_selected_preset_tab()
+        if not preset_name:
+            messagebox.showwarning("警告", "請先選擇一個預設!")
+            return
+        
+        result = messagebox.askyesno("確認刪除", f"確定要刪除預設 '{preset_name}' 嗎?\n此操作無法復原!")
+        if result:
+            if self.preset_manager.delete_preset(preset_name):
+                messagebox.showinfo("成功", f"預設 '{preset_name}' 刪除成功!")
+                self.refresh_preset_list_tab()
+                self.selected_preset_label.config(text=f"{get_text('parameter_name')}：{get_text('no_selection')}")
+            else:
+                messagebox.showerror("錯誤", "刪除預設失敗!")
+    
+    def open_presets_folder_tab(self):
+        """打開預設文件夾"""
+        import subprocess
+        import platform
+        
+        preset_path = os.path.abspath(self.preset_manager.presets_dir)
+        
+        try:
+            if platform.system() == "Windows":
+                os.startfile(preset_path)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", preset_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", preset_path])
+        except Exception as e:
+            messagebox.showerror("錯誤", f"無法打開文件夾: {e}")
+    
+    def import_preset_tab(self):
+        """匯入預設配置"""
+        from tkinter import filedialog
+        file_path = filedialog.askopenfilename(
+            title="選擇要匯入的配置文件",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        
+        if file_path:
+            result = self.preset_manager.import_preset(file_path)
+            if result:
+                messagebox.showinfo("成功", f"配置匯入成功，名稱為: {result}")
+                self.refresh_preset_list_tab()
+            else:
+                messagebox.showerror("錯誤", "匯入配置失敗!")
+    
+    def export_preset_tab(self):
+        """匯出預設配置"""
+        from tkinter import filedialog
+        preset_name = self.get_selected_preset_tab()
+        if not preset_name:
+            messagebox.showwarning("警告", "請先選擇一個預設!")
+            return
+        
+        file_path = filedialog.asksaveasfilename(
+            title="選擇匯出位置",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialvalue=f"{preset_name}.json"
+        )
+        
+        if file_path:
+            if self.preset_manager.export_preset(preset_name, file_path):
+                messagebox.showinfo("成功", f"預設 '{preset_name}' 匯出成功!")
+            else:
+                messagebox.showerror("錯誤", "匯出預設失敗!")
 
 def create_settings_gui(config, start_ai_threads=None):
     root = tk.Tk()

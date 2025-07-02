@@ -9,6 +9,7 @@ import mss
 import win32api
 import win32con
 import sys
+import winsound  # ***** 新增：音效模組 *****
 from typing import Optional
 
 # 根據模型類型導入不同函式庫
@@ -53,6 +54,10 @@ def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
     # 優化：緩存配置項，減少屬性訪問
     last_pid_update = 0
     pid_check_interval = 1.0  # 每秒檢查一次PID參數變化
+    
+    # ***** 新增：音效提示相關變數 *****
+    last_sound_time = 0
+    sound_playing = False
     
     # 優化：預計算常用值
     half_width = config.width // 2
@@ -148,6 +153,61 @@ def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
             [region['left'] + x1, region['top'] + y1, region['left'] + x2, region['top'] + y2]
             for x1, y1, x2, y2 in boxes
         ]
+
+        # ***** 新增：單目標模式 - 只保留離準心最近的一個目標 *****
+        if config.single_target_mode and absolute_boxes:
+            crosshair_x, crosshair_y = config.crosshairX, config.crosshairY
+            closest_box = None
+            min_distance = float('inf')
+            closest_confidence = 0
+            
+            for i, box in enumerate(absolute_boxes):
+                abs_x1, abs_y1, abs_x2, abs_y2 = box
+                # 計算邊界框中心點距離準心的距離
+                box_center_x = (abs_x1 + abs_x2) * 0.5
+                box_center_y = (abs_y1 + abs_y2) * 0.5
+                distance = math.sqrt((box_center_x - crosshair_x)**2 + (box_center_y - crosshair_y)**2)
+                
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_box = box
+                    closest_confidence = confidences[i] if i < len(confidences) else 0.5
+            
+            # 只保留最近的一個目標
+            if closest_box:
+                absolute_boxes = [closest_box]
+                confidences = [closest_confidence]
+            else:
+                absolute_boxes = []
+                confidences = []
+
+        # ***** 新增：音效提示系統 - 檢測準心是否在敵人框內 *****
+        if not config.single_target_mode or not absolute_boxes:
+            crosshair_x, crosshair_y = config.crosshairX, config.crosshairY
+        target_detected = False
+        
+        if config.enable_sound_alert and absolute_boxes:
+            for box in absolute_boxes:
+                abs_x1, abs_y1, abs_x2, abs_y2 = box
+                # 檢查準心是否在敵人框內
+                if abs_x1 <= crosshair_x <= abs_x2 and abs_y1 <= crosshair_y <= abs_y2:
+                    target_detected = True
+                    break
+            
+            # 音效播放邏輯
+            if target_detected:
+                # 檢查音效間隔，避免過於頻繁播放
+                if current_time - last_sound_time >= config.sound_interval / 1000.0:
+                    try:
+                        # 異步播放音效，避免阻塞主線程
+                        threading.Thread(
+                            target=winsound.Beep, 
+                            args=(config.sound_frequency, config.sound_duration),
+                            daemon=True
+                        ).start()
+                        last_sound_time = current_time
+                    except Exception as e:
+                        pass  # 忽略音效播放錯誤
 
         if is_aiming and absolute_boxes:
             # 優化：預計算瞄準參數
