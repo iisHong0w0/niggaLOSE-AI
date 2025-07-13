@@ -1,6 +1,6 @@
 @echo off
 :: ======================================================================
-:: Axiom AI - 智能环境配置与启动脚本 (v2.3 - 路径修正版)
+:: Axiom AI - 环境配置与启动脚本
 :: ======================================================================
 
 :: --- 初始化环境 ---
@@ -133,7 +133,7 @@ echo.
 echo  📦 正在安装其余通用依赖包...
 
 :: 逐个安装包以便更好地错误处理
-set "packages=ultralytics PyQt6 pywin32 opencv-python mss Pillow"
+set "packages=ultralytics PyQt6 pywin32 opencv-python mss Pillow numpy"
 for %%p in (%packages%) do (
     echo  安装 %%p...
     python -m pip install %%p
@@ -165,7 +165,7 @@ echo ----------------------------------------------------------------
 set "all_good=1"
 
 :: 验证关键模块
-set "modules=torch ultralytics onnxruntime cv2 PIL PyQt6 win32api"
+set "modules=torch ultralytics onnxruntime cv2 PIL PyQt6 win32api numpy"
 for %%m in (%modules%) do (
     echo   - 验证模块: %%m
     python -c "import %%m" >nul 2>&1
