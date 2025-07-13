@@ -29,7 +29,11 @@ class PyQtOverlay(QWidget):
         self.timer.timeout.connect(self.update_overlay)
         
         # 優化：使用檢測間隔來統一更新頻率，轉換為毫秒
-        update_interval_ms = max(int(config.detect_interval * 1000), 8)  # 最小8ms，避免過高頻率
+        if getattr(config, 'performance_mode', False):
+            # 性能模式下使用更短的更新間隔
+            update_interval_ms = max(int(config.detect_interval * 1000), 1)  # 最小1ms，極高頻率
+        else:
+            update_interval_ms = max(int(config.detect_interval * 1000), 8)  # 最小8ms，避免過高頻率
         self.timer.start(update_interval_ms)
         print(f"覆蓋層更新間隔設置為: {update_interval_ms}ms (與檢測間隔 {config.detect_interval}s 同步)")
         
@@ -73,6 +77,23 @@ class PyQtOverlay(QWidget):
         if self.config.AimToggle:
             self.update()
 
+    def draw_corner_box(self, painter, x1, y1, x2, y2, corner_size=15):
+        """繪製四個角點"""
+        # 設定點的大小
+        point_size = 3
+        
+        # 左上角點
+        painter.drawEllipse(x1 - point_size//2, y1 - point_size//2, point_size, point_size)
+        
+        # 右上角點
+        painter.drawEllipse(x2 - point_size//2, y1 - point_size//2, point_size, point_size)
+        
+        # 左下角點
+        painter.drawEllipse(x1 - point_size//2, y2 - point_size//2, point_size, point_size)
+        
+        # 右下角點
+        painter.drawEllipse(x2 - point_size//2, y2 - point_size//2, point_size, point_size)
+
     def paintEvent(self, event):
         if not self.config.AimToggle: # 如果關閉了功能，就不繪製
             return
@@ -94,25 +115,28 @@ class PyQtOverlay(QWidget):
 
         # 根據開關決定是否畫人物框與概率
         if show_boxes and self.boxes:
-            pen_box = QPen(QColor(0, 255, 0, 200), 1)
+            pen_box = QPen(QColor(0, 255, 0, 200), 2)  # 增加線條粗細
             painter.setPen(pen_box)
-            font = QFont('Arial', 12, QFont.Weight.Bold)
-            painter.setFont(font)
             
-            # 優化：只有在需要顯示信心度時才設置文字畫筆
+            # 優化：只有在需要顯示信心度時才設置文字畫筆和字體
             show_confidence = self.config.show_confidence
             if show_confidence:
-                pen_text = QPen(QColor(255, 255, 0, 220), 2)
+                pen_text = QPen(QColor(255, 255, 0, 220), 1)
+                font = QFont('Arial', 9, QFont.Weight.Bold)  # 縮小字體
+                painter.setFont(font)
             
             for i, box in enumerate(self.boxes):
                 x1, y1, x2, y2 = map(int, box)
-                painter.drawRect(x1, y1, x2-x1, y2-y1)
+                
+                # 使用新的角框繪製方法
+                self.draw_corner_box(painter, x1, y1, x2, y2)
                 
                 if show_confidence and i < len(self.confidences):
                     confidence = self.confidences[i]
                     text = f"{confidence:.0%}"
                     painter.setPen(pen_text)
-                    painter.drawText(x1, y1-8, text)
+                    # 將文字移到左上角外側，並增加距離
+                    painter.drawText(x1 - 20, y1 - 15, text)
                     painter.setPen(pen_box)
 
 def start_pyqt_overlay(boxes_queue, confidences_queue, config):

@@ -27,13 +27,33 @@ class PIDController:
         # 微分項
         derivative = error - self.previous_error
         
+        # 調整P參數的響應曲線
+        # 50%以下保持原始比例，50%以上逐漸放大到200%
+        adjusted_kp = self.calculate_adjusted_kp(self.Kp)
+        
         # 計算輸出
-        output = (self.Kp * error) + (self.Ki * self.integral) + (self.Kd * derivative)
+        output = (adjusted_kp * error) + (self.Ki * self.integral) + (self.Kd * derivative)
         
         # 更新上一次的誤差
         self.previous_error = error
         
         return output
+    
+    def calculate_adjusted_kp(self, kp):
+        """
+        計算調整後的P參數
+        50%以下保持原始比例，50%以上逐漸放大到200%
+        """
+        if kp <= 0.5:
+            # 50%以下保持不變
+            return kp
+        else:
+            # 50%以上按比例放大
+            # 當kp=0.5時，輸出=0.5
+            # 當kp=1.0時，輸出=2.0
+            # 使用線性插值：y = 0.5 + (kp - 0.5) * 3
+            # 這樣kp從0.5到1.0，輸出從0.5到2.0
+            return 0.5 + (kp - 0.5) * 3.0
 
 def preprocess_image(image, model_input_size):
     """預處理圖像以適配ONNX模型"""

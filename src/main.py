@@ -10,6 +10,8 @@ import win32api
 import win32con
 import sys
 import winsound  # ***** 新增：音效模組 *****
+import os
+import psutil  # ***** 新增：進程優化模組 *****
 from typing import Optional
 
 # 根據模型類型導入不同函式庫
@@ -31,12 +33,105 @@ from scaling_warning_dialog import check_windows_scaling # ***** 新增此行 **
 # 全域變數宣告
 ai_thread: Optional[threading.Thread] = None
 auto_fire_thread: Optional[threading.Thread] = None
-anti_recoil_thread: Optional[threading.Thread] = None
+
+def optimize_cpu_performance(config):
+    """優化CPU性能設定"""
+    if not getattr(config, 'cpu_optimization', True):
+        return
+    
+    try:
+        # 獲取當前進程
+        current_process = psutil.Process()
+        
+        # 設定進程優先級 (Windows 專用)
+        if sys.platform == "win32":
+            process_priority = getattr(config, 'process_priority', 'high')
+            try:
+                if process_priority == 'realtime':
+                    current_process.nice(psutil.REALTIME_PRIORITY_CLASS)
+                    print("[性能優化] 設定進程優先級為：實時")
+                elif process_priority == 'high':
+                    current_process.nice(psutil.HIGH_PRIORITY_CLASS)
+                    print("[性能優化] 設定進程優先級為：高")
+                else:
+                    current_process.nice(psutil.NORMAL_PRIORITY_CLASS)
+                    print("[性能優化] 設定進程優先級為：正常")
+            except Exception as e:
+                print(f"[性能優化] 設定進程優先級失敗：{e}")
+        else:
+            print("[性能優化] 非Windows系統，跳過進程優先級設定")
+        
+        # 設定CPU親和性
+        cpu_affinity = getattr(config, 'cpu_affinity', None)
+        if cpu_affinity is not None:
+            current_process.cpu_affinity(cpu_affinity)
+            print(f"[性能優化] 設定CPU親和性為：{cpu_affinity}")
+        else:
+            # 使用所有可用CPU核心
+            all_cpus = list(range(psutil.cpu_count()))
+            current_process.cpu_affinity(all_cpus)
+            print(f"[性能優化] 使用所有CPU核心：{all_cpus}")
+        
+        # 設定線程優先級函數
+        def set_thread_priority(thread_priority='high'):
+            try:
+                import win32process
+                import win32api
+                
+                if thread_priority == 'realtime':
+                    win32process.SetThreadPriority(win32api.GetCurrentThread(), win32process.THREAD_PRIORITY_TIME_CRITICAL)
+                elif thread_priority == 'high':
+                    win32process.SetThreadPriority(win32api.GetCurrentThread(), win32process.THREAD_PRIORITY_HIGHEST)
+                else:
+                    win32process.SetThreadPriority(win32api.GetCurrentThread(), win32process.THREAD_PRIORITY_NORMAL)
+            except Exception as e:
+                print(f"[性能優化] 設定線程優先級失敗：{e}")
+        
+        # 返回線程優先級設定函數
+        return set_thread_priority
+        
+    except Exception as e:
+        print(f"[性能優化] CPU性能優化失敗：{e}")
+        return None
+
+def optimize_onnx_session(config):
+    """優化ONNX運行時設定"""
+    try:
+        # 設定ONNX運行時選項
+        session_options = ort.SessionOptions()
+        
+        # 啟用所有優化
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        
+        # 設定線程數量為CPU核心數
+        session_options.intra_op_num_threads = psutil.cpu_count()
+        session_options.inter_op_num_threads = psutil.cpu_count()
+        
+        # 啟用並行執行
+        session_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
+        
+        # 啟用記憶體優化
+        session_options.enable_mem_pattern = True
+        session_options.enable_cpu_mem_arena = True
+        
+        print(f"[性能優化] ONNX使用 {psutil.cpu_count()} 個CPU核心")
+        return session_options
+        
+    except Exception as e:
+        print(f"[性能優化] ONNX優化失敗：{e}")
+        return None
 
 
 
 def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
     """AI 推理和滑鼠控制的主要循環"""
+    # 設定線程優先級
+    set_thread_priority = optimize_cpu_performance(config)
+    if set_thread_priority:
+        thread_priority = getattr(config, 'thread_priority', 'high')
+        set_thread_priority(thread_priority)
+        print(f"[性能優化] AI線程優先級設定為：{thread_priority}")
+    
     screen_capture = mss.mss()
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -73,15 +168,14 @@ def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
             last_pid_update = current_time
         
         # 優化：緩存十字準心位置計算
-        if config.fov_follow_mouse and not config.enable_anti_recoil:
+        if config.fov_follow_mouse:
             try:
                 x, y = win32api.GetCursorPos()
                 config.crosshairX, config.crosshairY = x, y
             except Exception:
                 config.crosshairX, config.crosshairY = half_width, half_height
         else:
-            if not config.enable_anti_recoil:
-                config.crosshairX, config.crosshairY = half_width, half_height
+            config.crosshairX, config.crosshairY = half_width, half_height
 
         # 優化：一次性檢查所有瞄準鍵
         is_aiming = any(is_key_pressed(k) for k in config.AimKeys)
@@ -103,20 +197,13 @@ def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
         fov_size = config.fov_size
         crosshair_x, crosshair_y = config.crosshairX, config.crosshairY
         
-        # 優化：預計算FOV區域
-        fov_half = fov_size // 2
+        # 修改：檢測整個畫面而不是只檢測FOV區域
         region = {
-            "left": max(0, crosshair_x - fov_half),
-            "top": max(0, crosshair_y - fov_half),
-            "width": fov_size, 
-            "height": fov_size,
+            "left": 0,
+            "top": 0,
+            "width": config.width, 
+            "height": config.height,
         }
-        
-        # 優化：邊界檢查
-        if region['left'] + region['width'] > config.width: 
-            region['width'] = config.width - region['left']
-        if region['top'] + region['height'] > config.height: 
-            region['height'] = config.height - region['top']
 
         try:
             game_frame = np.array(screen_capture.grab(region))
@@ -148,11 +235,35 @@ def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
                 print(f"PyTorch 推理錯誤: {e}")
                 continue
 
-        # 優化：使用列表推導式進行座標轉換
-        absolute_boxes = [
-            [region['left'] + x1, region['top'] + y1, region['left'] + x2, region['top'] + y2]
-            for x1, y1, x2, y2 in boxes
-        ]
+        # 修改：由於檢測整個畫面，boxes已經是絕對座標，不需要轉換
+        absolute_boxes = boxes[:]
+        
+        # 新增：FOV過濾邏輯 - 只保留與FOV框有交集的人物框
+        # 改進：檢測整個畫面後，使用FOV框進行過濾
+        # 只要人物框與FOV框有任何重疊就會被保留（不需要完全包含）
+        if absolute_boxes:
+            fov_half = fov_size // 2
+            fov_left = crosshair_x - fov_half
+            fov_top = crosshair_y - fov_half
+            fov_right = crosshair_x + fov_half
+            fov_bottom = crosshair_y + fov_half
+            
+            filtered_boxes = []
+            filtered_confidences = []
+            
+            for i, box in enumerate(absolute_boxes):
+                x1, y1, x2, y2 = box
+                # 矩形交集檢測：只要人物框有一點點碰到FOV框就算
+                # 條件：人物框左邊 < FOV右邊 且 人物框右邊 > FOV左邊 且
+                #       人物框上邊 < FOV下邊 且 人物框下邊 > FOV上邊
+                if (x1 < fov_right and x2 > fov_left and 
+                    y1 < fov_bottom and y2 > fov_top):
+                    filtered_boxes.append(box)
+                    if i < len(confidences):
+                        filtered_confidences.append(confidences[i])
+            
+            absolute_boxes = filtered_boxes
+            confidences = filtered_confidences
 
         # ***** 新增：單目標模式 - 只保留離準心最近的一個目標 *****
         if config.single_target_mode and absolute_boxes:
@@ -241,7 +352,8 @@ def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
                 _, errorX, errorY = valid_targets[0]
                 dx, dy = pid_x.update(errorX), pid_y.update(errorY)
                 if abs(dx) > 0 or abs(dy) > 0:
-                    send_mouse_move(int(dx), int(dy))
+                    # 直接使用mouse_event
+                    send_mouse_move(int(dx), int(dy), method="delayed")
             else:
                 pid_x.reset()
                 pid_y.reset()
@@ -262,10 +374,23 @@ def ai_logic_loop(config, model, model_type, boxes_queue, confidences_queue):
         confidences_queue.put(confidences)
 
         # 優化：使用配置的檢測間隔，確保一致性
-        time.sleep(config.detect_interval)
+        # 在性能模式下進一步優化睡眠時間
+        if getattr(config, 'performance_mode', False):
+            # 極短睡眠時間以最大化CPU使用率
+            sleep_time = max(config.detect_interval, 0.0001)  # 最小0.1ms
+        else:
+            sleep_time = config.detect_interval
+        time.sleep(sleep_time)
 
 def auto_fire_loop(config, boxes_queue):
     """自動開火功能的獨立循環 - 修復按鍵更新問題"""
+    # 設定線程優先級
+    set_thread_priority = optimize_cpu_performance(config)
+    if set_thread_priority:
+        thread_priority = getattr(config, 'thread_priority', 'high')
+        set_thread_priority(thread_priority)
+        print(f"[性能優化] 自動開火線程優先級設定為：{thread_priority}")
+    
     last_key_state = False
     delay_start_time = None
     last_fire_time = 0
@@ -273,8 +398,8 @@ def auto_fire_loop(config, boxes_queue):
     last_box_update = 0
     
     # 優化參數 - 根據檢測間隔調整
-    BOX_UPDATE_INTERVAL = max(0.015, config.detect_interval)  # 與檢測間隔同步
-    KEY_CHECK_INTERVAL = 0.003  # 降低按鍵檢查間隔
+    BOX_UPDATE_INTERVAL = max(0.005, config.detect_interval)  # 更積極的更新間隔
+    KEY_CHECK_INTERVAL = 0.001  # 進一步降低按鍵檢查間隔
     
     # 修復：動態更新按鍵配置
     auto_fire_key = config.auto_fire_key
@@ -381,56 +506,24 @@ def auto_fire_loop(config, boxes_queue):
 
         last_key_state = key_state
         
-        # 優化：動態睡眠時間
-        sleep_time = KEY_CHECK_INTERVAL if key_state else 0.008
+        # 優化：動態睡眠時間，在性能模式下進一步優化
+        if getattr(config, 'performance_mode', False):
+            sleep_time = KEY_CHECK_INTERVAL if key_state else 0.002  # 性能模式下更短的睡眠時間
+        else:
+            sleep_time = KEY_CHECK_INTERVAL if key_state else 0.008
         time.sleep(sleep_time)
 
-def anti_recoil_loop(config):
-    """防後座力功能循環，在按住左鍵時向上移動FOV - 優化版本"""
-    original_crosshair_y = config.height // 2
-    was_pressing = False
-    last_check_time = 0
-    
-    # 優化：預計算睡眠間隔
-    performance_mode = getattr(config, 'performance_mode', False)
-    active_sleep = 0.008 if performance_mode else 0.01
-    inactive_sleep = 0.05 if performance_mode else 0.1
-    
-    while config.Running:
-        current_time = time.time()
-        
-        if not config.enable_anti_recoil:
-            if was_pressing:
-                config.crosshairY = original_crosshair_y
-                was_pressing = False
-            time.sleep(inactive_sleep)
-            continue
 
-        # 優化：減少按鍵檢測頻率，除非在性能模式下
-        if not performance_mode and (current_time - last_check_time < 0.008):
-            time.sleep(0.001)
-            continue
-        
-        last_check_time = current_time
-        is_pressing = is_key_pressed(0x01)
-
-        if is_pressing and not was_pressing:
-            original_crosshair_y = config.crosshairY
-        
-        if is_pressing:
-            config.crosshairY -= config.anti_recoil_speed
-            config.crosshairY = max(0, int(config.crosshairY))
-            time.sleep(active_sleep)
-        elif not is_pressing and was_pressing:
-            config.crosshairY = original_crosshair_y
-            time.sleep(active_sleep)
-        else:
-            time.sleep(inactive_sleep)
-            
-        was_pressing = is_pressing
 
 def aim_toggle_key_listener(config, update_gui_callback=None):
     """持續監聽自動瞄準開關快捷鍵 - 優化版本"""
+    # 設定線程優先級
+    set_thread_priority = optimize_cpu_performance(config)
+    if set_thread_priority:
+        thread_priority = getattr(config, 'thread_priority', 'high')
+        set_thread_priority(thread_priority)
+        print(f"[性能優化] 快捷鍵監聽線程優先級設定為：{thread_priority}")
+    
     last_state = False
     key_code = getattr(config, 'aim_toggle_key', 0x78)  # 默認 F9 鍵
     
@@ -443,7 +536,7 @@ def aim_toggle_key_listener(config, update_gui_callback=None):
     
     # 優化：預計算睡眠時間
     performance_mode = getattr(config, 'performance_mode', False)
-    sleep_interval = 0.03 if performance_mode else 0.05  # 性能模式下更頻繁檢查
+    sleep_interval = 0.01 if performance_mode else 0.03  # 性能模式下更頻繁檢查
     
     # 調試計數器
     debug_counter = 0
@@ -494,6 +587,11 @@ if __name__ == "__main__":
     
     config = Config()
     load_config(config)
+    
+    # 在程序開始時優化CPU性能
+    print("[性能優化] 正在優化CPU性能設定...")
+    optimize_cpu_performance(config)
+    print("[性能優化] ✓ CPU性能優化完成")
 
     # 優化：使用配置中的隊列大小設置
     max_queue_size = getattr(config, 'max_queue_size', 3)
@@ -502,7 +600,7 @@ if __name__ == "__main__":
 
     def start_ai_threads(model_path):
         """由 GUI 呼叫，載入模型並啟動/重啟 AI 執行緒"""
-        global ai_thread, auto_fire_thread, anti_recoil_thread, config
+        global ai_thread, auto_fire_thread, config
         
         # 停止現有線程
         if ai_thread is not None and ai_thread.is_alive():
@@ -510,8 +608,6 @@ if __name__ == "__main__":
             ai_thread.join()
             if auto_fire_thread is not None:
                 auto_fire_thread.join()
-            if anti_recoil_thread is not None:
-                anti_recoil_thread.join()
 
         config.Running = True
         
@@ -521,7 +617,15 @@ if __name__ == "__main__":
             try:
                 print(f"正在載入 ONNX 模型: {model_path}")
                 providers = ['DmlExecutionProvider', 'CPUExecutionProvider']
-                model = ort.InferenceSession(model_path, providers=providers)
+                
+                # 獲取優化的會話選項
+                session_options = optimize_onnx_session(config)
+                if session_options:
+                    model = ort.InferenceSession(model_path, providers=providers, sess_options=session_options)
+                    print(f"[性能優化] ONNX 模型已使用優化設定載入")
+                else:
+                    model = ort.InferenceSession(model_path, providers=providers)
+                
                 config.current_provider = model.get_providers()[0]
                 print(f"ONNX 模型載入成功，使用: {config.current_provider}")
             except Exception as e:
@@ -540,11 +644,9 @@ if __name__ == "__main__":
 
         ai_thread = threading.Thread(target=ai_logic_loop, args=(config, model, model_type, boxes_queue, confidences_queue), daemon=True)
         auto_fire_thread = threading.Thread(target=auto_fire_loop, args=(config, boxes_queue), daemon=True)
-        anti_recoil_thread = threading.Thread(target=anti_recoil_loop, args=(config,), daemon=True)
         
         ai_thread.start()
         auto_fire_thread.start()
-        anti_recoil_thread.start()
         print("AI 相關執行緒已啟動。")
         return True
 

@@ -1,6 +1,10 @@
 # win_utils.py
 import ctypes
 import win32api
+import win32con
+import time
+import random
+import threading
 from language_manager import get_text
 
 # Windows 虛擬按鍵碼對應英文名稱
@@ -53,7 +57,15 @@ def get_vk_name(key_code):
         return VK_TRANSLATIONS.get(lang, {}).get(name, name)
     return name
 
-# 滑鼠移動（SendInput）
+# ===== 高級反檢測滑鼠移動方式 =====
+
+# 全局變量用於緩存
+_last_move_time = 0
+_move_accumulator_x = 0.0
+_move_accumulator_y = 0.0
+_move_lock = threading.Lock()
+
+# 方式1: 原始 SendInput (容易被檢測)
 class MOUSEINPUT(ctypes.Structure):
     _fields_ = [
         ("dx", ctypes.c_long),
@@ -73,12 +85,225 @@ class INPUT(ctypes.Structure):
 INPUT_MOUSE = 0
 MOUSEEVENTF_MOVE = 0x0001
 
-def send_mouse_move(dx, dy):
+def send_mouse_move_sendinput(dx, dy):
+    """方式1: SendInput API (原始方式，容易被檢測)"""
     extra = ctypes.c_ulong(0)
     ii_ = INPUT._INPUT_UNION()
     ii_.mi = MOUSEINPUT(dx, dy, 0, MOUSEEVENTF_MOVE, 0, ctypes.pointer(extra))
     command = INPUT(INPUT_MOUSE, ii_)
     ctypes.windll.user32.SendInput(1, ctypes.byref(command), ctypes.sizeof(command))
+
+# 方式2: SetCursorPos (較隱蔽)
+def send_mouse_move_setcursor(dx, dy):
+    """方式2: SetCursorPos 絕對位置移動"""
+    try:
+        current_x, current_y = win32api.GetCursorPos()
+        new_x = current_x + dx
+        new_y = current_y + dy
+        win32api.SetCursorPos((new_x, new_y))
+    except Exception as e:
+        print(f"SetCursorPos 移動失敗: {e}")
+
+# 方式3: 分段移動 (模擬人類移動) - 修復版本
+def send_mouse_move_smooth(dx, dy, steps=2):
+    """方式3: 分段平滑移動，模擬人類移動軌跡 - 減少延遲"""
+    try:
+        current_x, current_y = win32api.GetCursorPos()
+        
+        # 減少步數和延遲以提高響應速度
+        step_x = dx / steps
+        step_y = dy / steps
+        
+        for i in range(steps):
+            # 減少隨機偏移量
+            random_offset_x = random.uniform(-0.2, 0.2)
+            random_offset_y = random.uniform(-0.2, 0.2)
+            
+            move_x = step_x + random_offset_x
+            move_y = step_y + random_offset_y
+            
+            current_x += move_x
+            current_y += move_y
+            
+            win32api.SetCursorPos((int(current_x), int(current_y)))
+            
+            # 大幅減少延遲
+            if i < steps - 1:  # 最後一步不延遲
+                time.sleep(random.uniform(0.0005, 0.001))
+            
+    except Exception as e:
+        print(f"平滑移動失敗: {e}")
+
+# 方式4: 硬件層級模擬
+def send_mouse_move_hardware(dx, dy):
+    """方式4: 硬件層級滑鼠移動模擬"""
+    try:
+        win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, dx, dy, 0, 0)
+    except Exception as e:
+        print(f"硬件層級移動失敗: {e}")
+
+# 方式5: 累積移動 (反檢測) - 新增
+def send_mouse_move_accumulate(dx, dy):
+    """方式5: 累積移動 - 避免頻繁小幅移動被檢測"""
+    global _last_move_time, _move_accumulator_x, _move_accumulator_y
+    
+    with _move_lock:
+        current_time = time.time()
+        
+        # 累積移動量
+        _move_accumulator_x += dx
+        _move_accumulator_y += dy
+        
+        # 只有當累積量足夠大或時間間隔足夠長時才執行移動
+        if (abs(_move_accumulator_x) >= 3 or abs(_move_accumulator_y) >= 3 or 
+            current_time - _last_move_time > 0.01):
+            
+            try:
+                # 使用隨機的API
+                if random.choice([True, False]):
+                    win32api.SetCursorPos((
+                        win32api.GetCursorPos()[0] + int(_move_accumulator_x),
+                        win32api.GetCursorPos()[1] + int(_move_accumulator_y)
+                    ))
+                else:
+                    win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 
+                                       int(_move_accumulator_x), 
+                                       int(_move_accumulator_y), 0, 0)
+                
+                _move_accumulator_x = 0
+                _move_accumulator_y = 0
+                _last_move_time = current_time
+                
+            except Exception as e:
+                print(f"累積移動失敗: {e}")
+
+# 方式6: 延遲執行 (異步) - 新增
+def send_mouse_move_delayed(dx, dy):
+    """方式6: 延遲執行移動（僅用mouse_event，無隨機延遲/隨機API）"""
+    def delayed_move():
+        try:
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, dx, dy, 0, 0)
+        except Exception:
+            pass
+    
+    # 異步執行
+    threading.Thread(target=delayed_move, daemon=True).start()
+
+# 方式7: 混合API調用 - 新增
+def send_mouse_move_mixed(dx, dy):
+    """方式7: 混合多種API調用方式"""
+    try:
+        # 隨機選擇實現方式
+        method = random.randint(1, 4)
+        
+        if method == 1:
+            # SetCursorPos
+            current_x, current_y = win32api.GetCursorPos()
+            win32api.SetCursorPos((current_x + dx, current_y + dy))
+        elif method == 2:
+            # mouse_event
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, dx, dy, 0, 0)
+        elif method == 3:
+            # 分兩步移動
+            half_dx, half_dy = dx // 2, dy // 2
+            current_x, current_y = win32api.GetCursorPos()
+            win32api.SetCursorPos((current_x + half_dx, current_y + half_dy))
+            time.sleep(0.0001)
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, dx - half_dx, dy - half_dy, 0, 0)
+        else:
+            # SendInput 但添加隨機時間戳
+            extra = ctypes.c_ulong(random.randint(1000, 9999))
+            ii_ = INPUT._INPUT_UNION()
+            ii_.mi = MOUSEINPUT(dx, dy, 0, MOUSEEVENTF_MOVE, 0, ctypes.pointer(extra))
+            command = INPUT(INPUT_MOUSE, ii_)
+            ctypes.windll.user32.SendInput(1, ctypes.byref(command), ctypes.sizeof(command))
+            
+    except Exception as e:
+        print(f"混合移動失敗: {e}")
+
+# 方式8: 貝塞爾曲線移動 (修復版本)
+def send_mouse_move_bezier(dx, dy, steps=3):
+    """方式8: 貝塞爾曲線移動 - 減少延遲版本"""
+    try:
+        current_x, current_y = win32api.GetCursorPos()
+        target_x = current_x + dx
+        target_y = current_y + dy
+        
+        # 簡化控制點計算
+        control_x = current_x + dx * 0.5 + random.uniform(-abs(dx)*0.1, abs(dx)*0.1)
+        control_y = current_y + dy * 0.5 + random.uniform(-abs(dy)*0.1, abs(dy)*0.1)
+        
+        # 減少步數
+        for i in range(steps + 1):
+            t = i / steps
+            
+            # 二次貝塞爾曲線公式
+            x = (1-t)**2 * current_x + 2*(1-t)*t * control_x + t**2 * target_x
+            y = (1-t)**2 * current_y + 2*(1-t)*t * control_y + t**2 * target_y
+            
+            win32api.SetCursorPos((int(x), int(y)))
+            
+            # 大幅減少延遲
+            if i < steps:
+                time.sleep(0.0005)
+            
+    except Exception as e:
+        print(f"貝塞爾移動失敗: {e}")
+
+# 方式9: 隨機選擇 (更新版本)
+def send_mouse_move_random(dx, dy):
+    """方式9: 隨機選擇移動方式，增加不可預測性"""
+    methods = [
+        send_mouse_move_setcursor,
+        send_mouse_move_hardware,
+        send_mouse_move_accumulate,
+        send_mouse_move_mixed,
+        lambda x, y: send_mouse_move_smooth(x, y, 2),
+    ]
+    
+    # 隨機選擇移動方式
+    method = random.choice(methods)
+    method(dx, dy)
+
+# 主要滑鼠移動函數 - 更新版本
+def send_mouse_move(dx, dy, method="mixed"):
+    """
+    主要滑鼠移動函數
+    method 選項:
+    - "sendinput": 原始SendInput (最快但容易被檢測)
+    - "setcursor": SetCursorPos (較隱蔽)
+    - "smooth": 平滑移動 (模擬人類)
+    - "hardware": 硬件層級 (較隱蔽)
+    - "accumulate": 累積移動 (反檢測)
+    - "delayed": 延遲執行 (異步)
+    - "mixed": 混合API (推薦)
+    - "bezier": 貝塞爾曲線 (最像人類)
+    - "random": 隨機方式 (不可預測)
+    """
+    if abs(dx) < 1 and abs(dy) < 1:
+        return  # 移動量太小，跳過
+    
+    if method == "sendinput":
+        send_mouse_move_sendinput(dx, dy)
+    elif method == "setcursor":
+        send_mouse_move_setcursor(dx, dy)
+    elif method == "smooth":
+        send_mouse_move_smooth(dx, dy)
+    elif method == "hardware":
+        send_mouse_move_hardware(dx, dy)
+    elif method == "accumulate":
+        send_mouse_move_accumulate(dx, dy)
+    elif method == "delayed":
+        send_mouse_move_delayed(dx, dy)
+    elif method == "mixed":
+        send_mouse_move_mixed(dx, dy)
+    elif method == "bezier":
+        send_mouse_move_bezier(dx, dy)
+    elif method == "random":
+        send_mouse_move_random(dx, dy)
+    else:
+        # 默認使用混合方式
+        send_mouse_move_mixed(dx, dy)
 
 def is_key_pressed(key_code):
     return win32api.GetAsyncKeyState(key_code) & 0x8000 != 0

@@ -84,12 +84,17 @@ class PresetManager:
                 'AimToggle': getattr(config_instance, 'AimToggle', True),
                 'keep_detecting': getattr(config_instance, 'keep_detecting', True),
                 'fov_follow_mouse': getattr(config_instance, 'fov_follow_mouse', False),
-                'enable_anti_recoil': getattr(config_instance, 'enable_anti_recoil', False),
-                'anti_recoil_speed': getattr(config_instance, 'anti_recoil_speed', 1.0),
+
                 
                 # 性能設定
-                'performance_mode': getattr(config_instance, 'performance_mode', False),
-                'max_queue_size': getattr(config_instance, 'max_queue_size', 3),
+                'performance_mode': getattr(config_instance, 'performance_mode', True),
+                'max_queue_size': getattr(config_instance, 'max_queue_size', 1),
+                
+                # CPU性能優化參數
+                'cpu_optimization': getattr(config_instance, 'cpu_optimization', True),
+                'thread_priority': getattr(config_instance, 'thread_priority', 'high'),
+                'process_priority': getattr(config_instance, 'process_priority', 'high'),
+                'cpu_affinity': getattr(config_instance, 'cpu_affinity', None),
                 
                 # 音效提示系統
                 'enable_sound_alert': getattr(config_instance, 'enable_sound_alert', True),

@@ -104,18 +104,18 @@ class SettingsWindow:
         self.start_ai_threads = start_ai_threads
         self.language_manager = language_manager  # 新增
         self.master.title(get_text("window_title"))
-        self.master.geometry('999x999')
+        self.master.geometry('999x777')
         self.master.protocol("WM_DELETE_WINDOW", self.quit_program)
 
         # --- 顏色與樣式 (設定為實例屬性) ---
         self.bg_main = "#250526"
         self.bg_frame = '#120606'
         self.fg_text = '#e0e6f0'
-        self.accent = '#230622'
-        self.btn_bg = '#230622'
-        self.btn_active = '#230622'
-        self.scale_trough = '#230622'
-        self.scale_slider = '#230622'
+        self.accent = '#230621'
+        self.btn_bg = '#230621'
+        self.btn_active = '#250526'
+        self.scale_trough = '#250526'
+        self.scale_slider = '#120606'
 
         self.master.configure(bg=self.bg_main)
 
@@ -165,7 +165,21 @@ class SettingsWindow:
                                     relief="raised",
                                     bd=2,
                                     width=12)
-        self.lang_button.pack(side="right", pady=5)
+        self.lang_button.pack(side="right", pady=5, padx=(0, 8))
+        
+        # 模式切換按鈕
+        mode_text = get_text("simple_mode") if getattr(self.config, 'advanced_mode', True) else get_text("advanced_mode")
+        self.mode_button = tk.Button(lang_frame, 
+                                    text=mode_text,
+                                    command=self.toggle_mode,
+                                    bg="#0066FF",
+                                    fg='white',
+                                    font=("Arial", 10, "bold"),
+                                    activebackground="#0088FF",
+                                    relief="raised",
+                                    bd=2,
+                                    width=12)
+        self.mode_button.pack(side="right", pady=5)
         # ------
 
         # --- 主要內容區域 ---
@@ -194,22 +208,26 @@ class SettingsWindow:
                  foreground=[("selected", self.fg_text), ("active", self.fg_text)])
 
         # 主分頁容器
-        main_notebook = ttk.Notebook(main_frame)
-        main_notebook.pack(fill="both", expand=True, pady=10)
+        self.main_notebook = ttk.Notebook(main_frame)
+        self.main_notebook.pack(fill="both", expand=True, pady=10)
 
         # 建立各個分頁
-        self.create_basic_settings_tab(main_notebook)
-        self.create_aim_control_tab(main_notebook)
-        self.create_keys_settings_tab(main_notebook)
-        self.create_auto_features_tab(main_notebook)
-        self.create_display_options_tab(main_notebook)
-        self.create_preset_management_tab(main_notebook)  # ***** 新增：預設管理分頁 *****
-        self.create_program_control_tab(main_notebook)
+        self.create_basic_settings_tab(self.main_notebook)
+        self.create_aim_control_tab(self.main_notebook)
+        self.create_keys_settings_tab(self.main_notebook)
+        self.create_auto_features_tab(self.main_notebook)
+        self.create_display_options_tab(self.main_notebook)
+        self.create_preset_management_tab(self.main_notebook)  # ***** 新增：預設管理分頁 *****
+        self.create_program_control_tab(self.main_notebook)
+        
+        # 初始化模式相關變數
+        self.preset_management_tab_index = 5  # 預設管理分頁的索引
+        self.update_mode_visibility()
 
         self.listening_for_slot = None
         self.key_listener()
         self.poll_aimtoggle_status()
-        self.toggle_anti_recoil(init=True)
+
         
         # 初始化模型
         if self.start_ai_threads: 
@@ -252,7 +270,7 @@ class SettingsWindow:
         
         self.fov_size_slider = self.create_slider(params_frame, get_text("fov_size"), self.config.fov_size, 50, min(self.config.width, self.config.height), self.fov_size_configurator, slider_name="fov_size")
         self.min_confidence_slider = self.create_slider(params_frame, get_text("min_confidence"), self.config.min_confidence * 100, 0, 100, self.min_confidence_configurator, slider_name="min_confidence")
-        self.detect_interval_slider = self.create_slider(params_frame, get_text("detect_interval"), self.config.detect_interval * 1000, 1, 100, self.detect_interval_configurator, slider_name="detect_interval")
+        self.detect_interval_slider = self.create_slider(params_frame, get_text("detect_interval"), self.config.detect_interval * 1000, 0.1, 10, self.detect_interval_configurator, slider_name="detect_interval")
         
         # ***** 新增：單目標模式設定 *****
         self.single_target_var = tk.BooleanVar(value=getattr(self.config, 'single_target_mode', True))
@@ -265,6 +283,51 @@ class SettingsWindow:
                                                selectcolor=self.bg_main, 
                                                font=("Arial", 10))
         single_target_checkbox.pack(anchor="w", pady=(5, 0))
+        
+        # ***** 新增：CPU性能優化設定 *****
+        cpu_frame = create_section_frame(tab, "CPU 性能優化")
+        cpu_frame.pack(fill="x", pady=(15, 0))
+        
+        self.cpu_optimization_var = tk.BooleanVar(value=getattr(self.config, 'cpu_optimization', True))
+        cpu_opt_checkbox = tk.Checkbutton(cpu_frame, 
+                                         text="啟用 CPU 性能優化", 
+                                         variable=self.cpu_optimization_var, 
+                                         command=self.toggle_cpu_optimization, 
+                                         bg=self.bg_frame, 
+                                         fg=self.fg_text, 
+                                         selectcolor=self.bg_main, 
+                                         font=("Arial", 10))
+        cpu_opt_checkbox.pack(anchor="w", pady=(5, 0))
+        
+        # 進程優先級設定
+        priority_frame = tk.Frame(cpu_frame, bg=self.bg_frame)
+        priority_frame.pack(fill="x", pady=(5, 0))
+        
+        tk.Label(priority_frame, text="進程優先級:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10)).pack(side="left")
+        
+        self.process_priority_var = tk.StringVar(value=getattr(self.config, 'process_priority', 'high'))
+        process_priority_menu = ttk.Combobox(priority_frame, 
+                                           textvariable=self.process_priority_var, 
+                                           values=["normal", "high", "realtime"], 
+                                           state="readonly", 
+                                           width=10)
+        process_priority_menu.pack(side="left", padx=(10, 0))
+        process_priority_menu.bind("<<ComboboxSelected>>", self.on_process_priority_change)
+        
+        # 線程優先級設定
+        thread_priority_frame = tk.Frame(cpu_frame, bg=self.bg_frame)
+        thread_priority_frame.pack(fill="x", pady=(5, 0))
+        
+        tk.Label(thread_priority_frame, text="線程優先級:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10)).pack(side="left")
+        
+        self.thread_priority_var = tk.StringVar(value=getattr(self.config, 'thread_priority', 'high'))
+        thread_priority_menu = ttk.Combobox(thread_priority_frame, 
+                                          textvariable=self.thread_priority_var, 
+                                          values=["normal", "high", "realtime"], 
+                                          state="readonly", 
+                                          width=10)
+        thread_priority_menu.pack(side="left", padx=(10, 0))
+        thread_priority_menu.bind("<<ComboboxSelected>>", self.on_thread_priority_change)
     
     def create_aim_control_tab(self, notebook):
         """建立瞄準控制分頁"""
@@ -276,33 +339,49 @@ class SettingsWindow:
                                  bg=self.bg_frame, fg=self.fg_text, bd=2, relief="groove",
                                  labelanchor="n", padx=15, pady=10)
         
+        # 檢查是否為高級模式
+        is_advanced = getattr(self.config, 'advanced_mode', True)
+        
         # PID 控制器
         pid_frame = create_section_frame(tab, get_text("aim_speed_pid"))
         pid_frame.pack(fill="x", pady=(0, 15))
 
-        pid_tabs = ttk.Notebook(pid_frame)
-        style = ttk.Style()
-        style.configure("PID.TNotebook", background=self.bg_frame, borderwidth=0)
-        style.configure("PID.TNotebook.Tab", 
-                       background=self.accent, 
-                       foreground=self.fg_text, 
-                       padding=[8, 4], 
-                       borderwidth=1)
-        
-        tab_x = tk.Frame(pid_tabs, bg=self.bg_frame, padx=5, pady=5)
-        tab_y = tk.Frame(pid_tabs, bg=self.bg_frame, padx=5, pady=5)
-        pid_tabs.add(tab_x, text=get_text("horizontal_x"))
-        pid_tabs.add(tab_y, text=get_text("vertical_y"))
-        pid_tabs.pack(expand=True, fill="both")
-        
-        self.pid_kp_x_slider = self.create_slider(tab_x, get_text("reaction_speed_p"), self.config.pid_kp_x, 0, 1, self.pid_kp_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kp_x")
-        self.pid_ki_x_slider = self.create_slider(tab_x, get_text("error_correction_i"), self.config.pid_ki_x, 0, 0.1, self.pid_ki_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_ki_x")
-        self.pid_kd_x_slider = self.create_slider(tab_x, get_text("stability_suppression_d"), self.config.pid_kd_x, 0, 0.2, self.pid_kd_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kd_x")
+        if is_advanced:
+            # 高級模式：分離X/Y軸控制，顯示完整PID參數
+            pid_tabs = ttk.Notebook(pid_frame)
+            style = ttk.Style()
+            style.configure("PID.TNotebook", background=self.bg_frame, borderwidth=0)
+            style.configure("PID.TNotebook.Tab", 
+                           background=self.accent, 
+                           foreground=self.fg_text, 
+                           padding=[8, 4], 
+                           borderwidth=1)
+            
+            tab_x = tk.Frame(pid_tabs, bg=self.bg_frame, padx=5, pady=5)
+            tab_y = tk.Frame(pid_tabs, bg=self.bg_frame, padx=5, pady=5)
+            pid_tabs.add(tab_x, text=get_text("horizontal_x"))
+            pid_tabs.add(tab_y, text=get_text("vertical_y"))
+            pid_tabs.pack(expand=True, fill="both")
+            
+            self.pid_kp_x_slider = self.create_slider(tab_x, get_text("reaction_speed_p"), self.config.pid_kp_x, 0, 1, self.pid_kp_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kp_x")
+            self.pid_ki_x_slider = self.create_slider(tab_x, get_text("error_correction_i"), self.config.pid_ki_x, 0, 0.1, self.pid_ki_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_ki_x")
+            self.pid_kd_x_slider = self.create_slider(tab_x, get_text("stability_suppression_d"), self.config.pid_kd_x, 0, 0.2, self.pid_kd_x_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kd_x")
 
-        self.pid_kp_y_slider = self.create_slider(tab_y, get_text("reaction_speed_p"), self.config.pid_kp_y, 0, 1, self.pid_kp_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kp_y")
-        self.pid_ki_y_slider = self.create_slider(tab_y, get_text("error_correction_i"), self.config.pid_ki_y, 0, 0.1, self.pid_ki_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_ki_y")
-        self.pid_kd_y_slider = self.create_slider(tab_y, get_text("stability_suppression_d"), self.config.pid_kd_y, 0, 0.2, self.pid_kd_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kd_y")
-        
+            self.pid_kp_y_slider = self.create_slider(tab_y, get_text("reaction_speed_p"), self.config.pid_kp_y, 0, 1, self.pid_kp_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kp_y")
+            self.pid_ki_y_slider = self.create_slider(tab_y, get_text("error_correction_i"), self.config.pid_ki_y, 0, 0.1, self.pid_ki_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_ki_y")
+            self.pid_kd_y_slider = self.create_slider(tab_y, get_text("stability_suppression_d"), self.config.pid_kd_y, 0, 0.2, self.pid_kd_y_configurator, res=0.001, val_format=".3f", length=400, slider_name="pid_kd_y")
+        else:
+            # 簡單模式：統一X/Y軸速度，只顯示P值
+            self.unified_pid_kp_slider = self.create_slider(pid_frame, get_text("unified_xy_speed"), self.config.pid_kp_x, 0, 1, self.unified_pid_kp_configurator, res=0.001, val_format=".3f", length=400, slider_name="unified_pid_kp")
+            
+            # 保留原有的滑條變數以保持兼容性，但隱藏
+            self.pid_kp_x_slider = None
+            self.pid_ki_x_slider = None
+            self.pid_kd_x_slider = None
+            self.pid_kp_y_slider = None
+            self.pid_ki_y_slider = None
+            self.pid_kd_y_slider = None
+
         # 瞄準部位設定
         aim_frame = create_section_frame(tab, get_text("aim_part"))
         aim_frame.pack(fill="x", pady=(0, 15))
@@ -326,26 +405,32 @@ class SettingsWindow:
         ttk.Combobox(aim_frame, textvariable=self.AimPartVar, values=[get_text("head"), get_text("body")], state="readonly", width=15).pack(anchor="w", pady=(0,10))
         self.AimPartVar.trace_add("write", self.aim_part_changed)
         
-        # 目標區域設定
-        area_frame = create_section_frame(tab, get_text("target_area_settings"))
-        area_frame.pack(fill="x")
-        
-        area_left = tk.Frame(area_frame, bg=self.bg_frame)
-        area_right = tk.Frame(area_frame, bg=self.bg_frame)
-        area_left.pack(side="left", fill="both", expand=True, padx=(0, 10))
-        area_right.pack(side="right", fill="both", expand=True)
-        
-        # 頭部設定
-        tk.Label(area_left, text="頭部區域:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        self.head_width_ratio_slider = self.create_slider(area_left, get_text("head_width_ratio"), self.config.head_width_ratio * 100, 10, 100, self.head_width_ratio_configurator, res=1, val_format=".0f")
-        self.head_height_ratio_slider = self.create_slider(area_left, get_text("head_height_ratio"), self.config.head_height_ratio * 100, 10, 50, self.head_height_ratio_configurator, res=1, val_format=".0f")
-        
-        # 身體設定
-        tk.Label(area_right, text="身體區域:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        self.body_width_ratio_slider = self.create_slider(area_right, get_text("body_width_ratio"), self.config.body_width_ratio * 100, 50, 100, self.body_width_ratio_configurator, res=1, val_format=".0f")
-        
-        # 添加說明文字
-        tk.Label(area_right, text="※ 身體高度 = 100% - 頭部高度", bg=self.bg_frame, fg="#888888", font=("Arial", 8)).pack(anchor="w", pady=(5, 0))
+        # 目標區域設定 - 在簡單模式下隱藏
+        if is_advanced:
+            area_frame = create_section_frame(tab, get_text("target_area_settings"))
+            area_frame.pack(fill="x")
+            
+            area_left = tk.Frame(area_frame, bg=self.bg_frame)
+            area_right = tk.Frame(area_frame, bg=self.bg_frame)
+            area_left.pack(side="left", fill="both", expand=True, padx=(0, 10))
+            area_right.pack(side="right", fill="both", expand=True)
+            
+            # 頭部設定
+            tk.Label(area_left, text="頭部區域:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
+            self.head_width_ratio_slider = self.create_slider(area_left, get_text("head_width_ratio"), self.config.head_width_ratio * 100, 10, 100, self.head_width_ratio_configurator, res=1, val_format=".0f")
+            self.head_height_ratio_slider = self.create_slider(area_left, get_text("head_height_ratio"), self.config.head_height_ratio * 100, 10, 50, self.head_height_ratio_configurator, res=1, val_format=".0f")
+            
+            # 身體設定
+            tk.Label(area_right, text="身體區域:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 5))
+            self.body_width_ratio_slider = self.create_slider(area_right, get_text("body_width_ratio"), self.config.body_width_ratio * 100, 50, 100, self.body_width_ratio_configurator, res=1, val_format=".0f")
+            
+            # 添加說明文字
+            tk.Label(area_right, text="※ 身體高度 = 100% - 頭部高度", bg=self.bg_frame, fg="#888888", font=("Arial", 8)).pack(anchor="w", pady=(5, 0))
+        else:
+            # 簡單模式下隱藏頭身比例設定，設置為None以保持兼容性
+            self.head_width_ratio_slider = None
+            self.head_height_ratio_slider = None
+            self.body_width_ratio_slider = None
 
     def create_keys_settings_tab(self, notebook):
         """建立按鍵設定分頁"""
@@ -420,14 +505,7 @@ class SettingsWindow:
         self.auto_fire_delay_slider = self.create_slider(autofire_frame, get_text("scope_delay"), self.config.auto_fire_delay, 0, 1, self.auto_fire_delay_configurator, res=0.01, val_format=".2f")
         self.auto_fire_interval_slider = self.create_slider(autofire_frame, get_text("fire_interval"), self.config.auto_fire_interval, 0, 1, self.auto_fire_interval_configurator, res=0.01, val_format=".2f")
         
-        # 防後座力設定
-        recoil_frame = create_section_frame(tab, get_text("enable_anti_recoil"))
-        recoil_frame.pack(fill="x")
-        
-        self.enable_anti_recoil_var = tk.BooleanVar(value=self.config.enable_anti_recoil)
-        tk.Checkbutton(recoil_frame, text=get_text("enable_anti_recoil"), variable=self.enable_anti_recoil_var, command=self.toggle_anti_recoil, bg=self.bg_frame, fg=self.fg_text, selectcolor=self.bg_main, font=("Arial", 10)).pack(anchor="w", pady=(0, 10))
-        
-        self.anti_recoil_speed_slider = self.create_slider(recoil_frame, get_text("anti_recoil_speed"), self.config.anti_recoil_speed, 0, 10, self.anti_recoil_speed_configurator, res=0.1, val_format=".1f")
+
 
     def create_display_options_tab(self, notebook):
         """建立顯示選項分頁"""
@@ -458,25 +536,33 @@ class SettingsWindow:
         self.fov_follow_mouse_checkbox = tk.Checkbutton(options_frame, text=get_text("fov_follow_mouse"), variable=self.fov_follow_mouse_var, command=self.toggle_fov_follow_mouse, bg=self.bg_frame, fg=self.fg_text, selectcolor=self.bg_main, font=("Arial", 10))
         self.fov_follow_mouse_checkbox.pack(anchor="w", pady=5)
 
-        # ***** 新增：音效提示系統設定 *****
-        sound_frame = create_section_frame(tab, get_text("sound_alert_system"))
-        sound_frame.pack(fill="x", pady=(15, 0))
-        
-        # 啟用音效提示復選框
-        self.enable_sound_alert_var = tk.BooleanVar(value=getattr(self.config, 'enable_sound_alert', True))
-        tk.Checkbutton(sound_frame, 
-                      text=get_text("enable_sound_alert"), 
-                      variable=self.enable_sound_alert_var, 
-                      command=self.toggle_sound_alert, 
-                      bg=self.bg_frame, 
-                      fg=self.fg_text, 
-                      selectcolor=self.bg_main, 
-                      font=("Arial", 10)).pack(anchor="w", pady=(0, 10))
-        
-        # 音效參數滑條
-        self.sound_frequency_slider = self.create_slider(sound_frame, get_text("sound_frequency"), getattr(self.config, 'sound_frequency', 1000), 400, 2000, self.sound_frequency_configurator, res=50, val_format=".0f")
-        self.sound_duration_slider = self.create_slider(sound_frame, get_text("sound_duration"), getattr(self.config, 'sound_duration', 100), 50, 500, self.sound_duration_configurator, res=10, val_format=".0f")
-        self.sound_interval_slider = self.create_slider(sound_frame, get_text("sound_interval"), getattr(self.config, 'sound_interval', 200), 100, 1000, self.sound_interval_configurator, res=50, val_format=".0f")
+        # ***** 新增：音效提示系統設定 - 只在高級模式下顯示 *****
+        is_advanced = getattr(self.config, 'advanced_mode', True)
+        if is_advanced:
+            sound_frame = create_section_frame(tab, get_text("sound_alert_system"))
+            sound_frame.pack(fill="x", pady=(15, 0))
+            
+            # 啟用音效提示復選框
+            self.enable_sound_alert_var = tk.BooleanVar(value=getattr(self.config, 'enable_sound_alert', True))
+            tk.Checkbutton(sound_frame, 
+                          text=get_text("enable_sound_alert"), 
+                          variable=self.enable_sound_alert_var, 
+                          command=self.toggle_sound_alert, 
+                          bg=self.bg_frame, 
+                          fg=self.fg_text, 
+                          selectcolor=self.bg_main, 
+                          font=("Arial", 10)).pack(anchor="w", pady=(0, 10))
+            
+            # 音效參數滑條
+            self.sound_frequency_slider = self.create_slider(sound_frame, get_text("sound_frequency"), getattr(self.config, 'sound_frequency', 1000), 400, 2000, self.sound_frequency_configurator, res=50, val_format=".0f")
+            self.sound_duration_slider = self.create_slider(sound_frame, get_text("sound_duration"), getattr(self.config, 'sound_duration', 100), 50, 500, self.sound_duration_configurator, res=10, val_format=".0f")
+            self.sound_interval_slider = self.create_slider(sound_frame, get_text("sound_interval"), getattr(self.config, 'sound_interval', 200), 100, 1000, self.sound_interval_configurator, res=50, val_format=".0f")
+        else:
+            # 簡單模式下隱藏音效設置，設置為None以保持兼容性
+            self.enable_sound_alert_var = tk.BooleanVar(value=getattr(self.config, 'enable_sound_alert', True))
+            self.sound_frequency_slider = None
+            self.sound_duration_slider = None
+            self.sound_interval_slider = None
 
     def create_preset_management_tab(self, notebook):
         """建立預設管理分頁"""
@@ -638,7 +724,8 @@ class SettingsWindow:
         self.AimLabel = tk.Label(control_frame, text=f"{get_text('auto_aim')}: {get_text('status_panel_on') if self.config.AimToggle else get_text('status_panel_off')}", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 11))
         self.AimLabel.pack(pady=8)
         
-        provider_str = get_text("gpu_directml") if "Dml" in self.config.current_provider else get_text("cpu")
+        # 使用與狀態面板相同的邏輯來獲取運算模式文字
+        provider_str = self.get_compute_mode_text()
         self.ProviderLabel = tk.Label(control_frame, text=f"{get_text('compute_mode')}: {provider_str}", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 11))
         self.ProviderLabel.pack(pady=8)
         
@@ -748,10 +835,14 @@ class SettingsWindow:
     def pid_kp_y_configurator(self, v): self.config.pid_kp_y = float(v)
     def pid_ki_y_configurator(self, v): self.config.pid_ki_y = float(v)
     def pid_kd_y_configurator(self, v): self.config.pid_kd_y = float(v)
+    def unified_pid_kp_configurator(self, v): 
+        """統一PID P值配置器 - 同時設定X和Y軸"""
+        value = float(v)
+        self.config.pid_kp_x = value
+        self.config.pid_kp_y = value
     def auto_fire_delay_configurator(self, v): self.config.auto_fire_delay = float(v)
     def auto_fire_interval_configurator(self, v): self.config.auto_fire_interval = float(v)
-    def anti_recoil_speed_configurator(self, v): self.config.anti_recoil_speed = float(v)
-    
+
     # 目標區域占比配置方法
     def head_width_ratio_configurator(self, v): self.config.head_width_ratio = float(v) / 100.0
     def head_height_ratio_configurator(self, v): self.config.head_height_ratio = float(v) / 100.0
@@ -773,17 +864,7 @@ class SettingsWindow:
     def toggle_keep_detecting(self): self.config.keep_detecting = self.keep_detecting_var.get()
     def toggle_fov_follow_mouse(self): self.config.fov_follow_mouse = self.fov_follow_mouse_var.get()
     
-    def toggle_anti_recoil(self, init=False):
-        is_enabled = self.enable_anti_recoil_var.get()
-        if not init:
-            self.config.enable_anti_recoil = is_enabled
-        
-        if is_enabled:
-            self.fov_follow_mouse_var.set(False)
-            self.config.fov_follow_mouse = False
-            self.fov_follow_mouse_checkbox.config(state="disabled")
-        else:
-            self.fov_follow_mouse_checkbox.config(state="normal")
+
     
     def aim_part_changed(self, var_name=None, index=None, mode=None): 
         # 將顯示的中文文字轉換為內部使用的英文值
@@ -872,6 +953,83 @@ class SettingsWindow:
         self.language_manager.set_language(new_lang)
         self.refresh_ui_text()
 
+    def toggle_mode(self):
+        """切換高級/簡單模式"""
+        self.config.advanced_mode = not getattr(self.config, 'advanced_mode', True)
+        
+        # 更新按鈕文字
+        mode_text = get_text("simple_mode") if self.config.advanced_mode else get_text("advanced_mode")
+        self.mode_button.config(text=mode_text)
+        
+        # 更新介面可見性
+        self.update_mode_visibility()
+        
+        # 儲存配置
+        save_config(self.config)
+        
+        print(f"已切換至{'高級' if self.config.advanced_mode else '簡單'}模式")
+
+    def update_mode_visibility(self):
+        """根據當前模式更新介面元素的可見性"""
+        is_advanced = getattr(self.config, 'advanced_mode', True)
+        
+        # 簡單模式下隱藏預設管理分頁
+        if not is_advanced:
+            try:
+                # 隱藏預設管理分頁
+                if self.preset_management_tab_index < len(self.main_notebook.tabs()):
+                    self.main_notebook.hide(self.preset_management_tab_index)
+            except Exception as e:
+                print(f"隱藏預設管理分頁時發生錯誤: {e}")
+        else:
+            try:
+                # 顯示預設管理分頁
+                if self.preset_management_tab_index < len(self.main_notebook.tabs()):
+                    tab_id = self.main_notebook.tabs()[self.preset_management_tab_index]
+                    if tab_id not in [self.main_notebook.tabs()[i] for i in range(len(self.main_notebook.tabs())) if self.main_notebook.tab(i, "state") != "hidden"]:
+                        self.main_notebook.add(self.main_notebook.nametowidget(tab_id), text=get_text("tab_preset_management"))
+            except Exception as e:
+                print(f"顯示預設管理分頁時發生錯誤: {e}")
+        
+        # 重新創建分頁以應用模式變更
+        self.recreate_tabs_for_mode_change()
+
+    def recreate_tabs_for_mode_change(self):
+        """重新創建分頁以應用模式變更"""
+        try:
+            # 保存當前選中的分頁索引
+            current_tab = self.main_notebook.index(self.main_notebook.select())
+            
+            # 清除所有分頁
+            for tab in self.main_notebook.tabs():
+                self.main_notebook.forget(tab)
+            
+            # 重新創建分頁
+            self.create_basic_settings_tab(self.main_notebook)
+            self.create_aim_control_tab(self.main_notebook)
+            self.create_keys_settings_tab(self.main_notebook)
+            self.create_auto_features_tab(self.main_notebook)
+            self.create_display_options_tab(self.main_notebook)
+            
+            # 只在高級模式下添加預設管理分頁
+            is_advanced = getattr(self.config, 'advanced_mode', True)
+            if is_advanced:
+                self.create_preset_management_tab(self.main_notebook)
+            
+            self.create_program_control_tab(self.main_notebook)
+            
+            # 恢復選中的分頁（如果可能）
+            try:
+                if current_tab < len(self.main_notebook.tabs()):
+                    self.main_notebook.select(current_tab)
+                else:
+                    self.main_notebook.select(0)
+            except:
+                self.main_notebook.select(0)
+                
+        except Exception as e:
+            print(f"重新創建分頁時發生錯誤: {e}")
+
     def refresh_ui_text(self):
         """刷新所有UI文字"""
         self.master.title(get_text("window_title"))
@@ -881,6 +1039,9 @@ class SettingsWindow:
         self.lang_button.config(text=button_text)
         donate_text = get_text("donate") if current_lang == "zh_tw" else get_text("donate_en")
         self.donate_button.config(text=donate_text)
+        # 更新模式切換按鈕文字
+        mode_text = get_text("simple_mode") if getattr(self.config, 'advanced_mode', True) else get_text("advanced_mode")
+        self.mode_button.config(text=mode_text)
         self.restart_gui()
 
     def restart_gui(self):
@@ -894,7 +1055,7 @@ class SettingsWindow:
         """更新狀態標籤文字"""
         aim_status = get_text("status_panel_on") if self.config.AimToggle else get_text("status_panel_off")
         self.AimLabel.config(text=f"{get_text('auto_aim')}: {aim_status}")
-        provider_str = get_text("gpu_directml") if "Dml" in self.config.current_provider else get_text("cpu")
+        provider_str = self.get_compute_mode_text()
         self.ProviderLabel.config(text=f"{get_text('compute_mode')}: {provider_str}")
 
     def open_donate_page(self):
@@ -910,6 +1071,47 @@ class SettingsWindow:
     def toggle_sound_alert(self):
         """切換音效提示"""
         self.config.enable_sound_alert = self.enable_sound_alert_var.get()
+    
+    def toggle_cpu_optimization(self):
+        """切換CPU性能優化"""
+        self.config.cpu_optimization = self.cpu_optimization_var.get()
+        if self.config.cpu_optimization:
+            print("[設定] CPU性能優化已啟用")
+        else:
+            print("[設定] CPU性能優化已停用")
+    
+    def on_process_priority_change(self, event=None):
+        """進程優先級變更"""
+        self.config.process_priority = self.process_priority_var.get()
+        print(f"[設定] 進程優先級設定為：{self.config.process_priority}")
+    
+    def on_thread_priority_change(self, event=None):
+        """線程優先級變更"""
+        self.config.thread_priority = self.thread_priority_var.get()
+        print(f"[設定] 線程優先級設定為：{self.config.thread_priority}")
+
+    def get_compute_mode_text(self):
+        """獲取運算模式文字，支援 ONNX 和 PyTorch 模型"""
+        model_path = getattr(self.config, 'model_path', '')
+        
+        # 檢查是否為 PyTorch 模型
+        if model_path.endswith('.pt'):
+            try:
+                import torch
+                # 檢查 CUDA 是否可用
+                if torch.cuda.is_available():
+                    return get_text("gpu_cuda")  # 新增 CUDA GPU 文字
+                else:
+                    return get_text("cpu")
+            except ImportError:
+                return get_text("cpu")
+        
+        # ONNX 模型邏輯
+        current_provider = getattr(self.config, 'current_provider', 'CPUExecutionProvider')
+        if "Dml" in current_provider:
+            return get_text("gpu_directml")
+        else:
+            return get_text("cpu")
 
     def open_preset_manager(self):
         """打開預設管理器（向後兼容）"""
@@ -969,8 +1171,7 @@ class SettingsWindow:
                 self.auto_fire_interval_slider.set(getattr(self.config, 'auto_fire_interval', 0.18))
                 
             # 防後座力參數
-            if hasattr(self, 'anti_recoil_speed_slider'):
-                self.anti_recoil_speed_slider.set(getattr(self.config, 'anti_recoil_speed', 1.0))
+
                 
             # 音效提示系統參數
             if hasattr(self, 'sound_frequency_slider'):
@@ -1013,8 +1214,7 @@ class SettingsWindow:
                 self.keep_detecting_var.set(getattr(self.config, 'keep_detecting', True))
             if hasattr(self, 'fov_follow_mouse_var'):
                 self.fov_follow_mouse_var.set(getattr(self.config, 'fov_follow_mouse', False))
-            if hasattr(self, 'enable_anti_recoil_var'):
-                self.enable_anti_recoil_var.set(getattr(self.config, 'enable_anti_recoil', False))
+
             if hasattr(self, 'single_target_var'):
                 self.single_target_var.set(getattr(self.config, 'single_target_mode', True))
             if hasattr(self, 'enable_sound_alert_var'):
@@ -1191,3 +1391,9 @@ def create_settings_gui(config, start_ai_threads=None):
     root = tk.Tk()
     app = SettingsWindow(root, config, start_ai_threads)
     root.mainloop()
+
+if __name__ == "__main__":
+    # 測試用的main函數
+    from config import Config
+    test_config = Config()
+    create_settings_gui(test_config)

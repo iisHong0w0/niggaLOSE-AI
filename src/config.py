@@ -62,8 +62,16 @@ class Config:
         self.pid_ki_y = 0.0       # 垂直 I: 積分
         self.pid_kd_y = 0.0       # 垂直 D: 微分
 
+        # 新增：勻速移動模式
+        self.constant_speed_mode = False  # 是否使用勻速移動而非PID控制
+        self.constant_speed_x = 2.0       # 水平勻速移動速度
+        self.constant_speed_y = 2.0       # 垂直勻速移動速度
+        
+        # 新增：滑鼠移動方式選擇
+        self.mouse_move_method = "delayed"  # 固定使用mouse_event
+
         # 優化：調整檢測間隔為更合理的值，平衡性能和響應速度
-        self.detect_interval = 0.006  # 6ms間隔，高響應速度
+        self.detect_interval = 0.001  # 1ms間隔，極高響應速度 (優化CPU性能)
         self.aim_toggle_key = 45  # Insert 鍵
         self.auto_fire_key2 = 0x04  # 滑鼠中鍵
         
@@ -78,9 +86,7 @@ class Config:
         # FOV 跟隨鼠標
         self.fov_follow_mouse = False
         
-        # 防後座力功能
-        self.enable_anti_recoil = False
-        self.anti_recoil_speed = 1.0 # 向上移動速度
+
 
         # 顯示開關
         self.show_fov = True
@@ -88,8 +94,17 @@ class Config:
         self.show_status_panel = True # ***** 新增此行 *****
         
         # 優化：性能相關設置
-        self.performance_mode = False  # 性能模式，啟用時會犧牲一些精度來提高性能
-        self.max_queue_size = 3  # 隊列最大大小，避免內存累積
+        self.performance_mode = True  # 預設啟用性能模式，最大化CPU使用率
+        self.max_queue_size = 1  # 減少隊列大小，降低延遲
+        
+        # 新增：CPU性能優化參數
+        self.cpu_optimization = True  # 啟用CPU優化
+        self.thread_priority = "high"  # 線程優先級：normal, high, realtime
+        self.process_priority = "high"  # 進程優先級：normal, high, realtime
+        self.cpu_affinity = None  # CPU親和性設定，None表示使用所有CPU核心
+        
+        # 新增：高級/簡單模式切換
+        self.advanced_mode = True  # True=高級模式，False=簡單模式
 
 def save_config(config_instance):
     """將所有可配置的參數儲存到 config.json"""
@@ -113,8 +128,7 @@ def save_config(config_instance):
         'keep_detecting': getattr(config_instance, 'keep_detecting', True),
         'fov_follow_mouse': getattr(config_instance, 'fov_follow_mouse', False),
         'aim_toggle_key': getattr(config_instance, 'aim_toggle_key', 45),
-        'enable_anti_recoil': getattr(config_instance, 'enable_anti_recoil', False),
-        'anti_recoil_speed': getattr(config_instance, 'anti_recoil_speed', 1.0),
+
         
         # ***** 新增的儲存項目 *****
         'model_path': getattr(config_instance, 'model_path', os.path.join('模型', 'Rivals.onnx')),
@@ -131,14 +145,26 @@ def save_config(config_instance):
         'body_width_ratio': getattr(config_instance, 'body_width_ratio', 0.87),
         
         # 優化：性能相關設置
-        'performance_mode': getattr(config_instance, 'performance_mode', False),
-        'max_queue_size': getattr(config_instance, 'max_queue_size', 3),
+        'performance_mode': getattr(config_instance, 'performance_mode', True),
+        'max_queue_size': getattr(config_instance, 'max_queue_size', 1),
+        
+        # 新增：CPU性能優化參數
+        'cpu_optimization': getattr(config_instance, 'cpu_optimization', True),
+        'thread_priority': getattr(config_instance, 'thread_priority', "high"),
+        'process_priority': getattr(config_instance, 'process_priority', "high"),
+        'cpu_affinity': getattr(config_instance, 'cpu_affinity', None),
         
         # ***** 新增：音效提示系統 *****
         'enable_sound_alert': getattr(config_instance, 'enable_sound_alert', True),
         'sound_frequency': getattr(config_instance, 'sound_frequency', 1000),
         'sound_duration': getattr(config_instance, 'sound_duration', 100),
         'sound_interval': getattr(config_instance, 'sound_interval', 200),
+        
+        # 新增：高級/簡單模式切換
+        'advanced_mode': getattr(config_instance, 'advanced_mode', True),
+        
+        # 新增：滑鼠移動方式
+        'mouse_move_method': getattr(config_instance, 'mouse_move_method', 'delayed'),
     }
     try:
         with open('config.json', 'w', encoding='utf-8') as f:

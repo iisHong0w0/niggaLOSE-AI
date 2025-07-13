@@ -23,6 +23,29 @@ def draw_text_with_outline(painter, x, y, text, text_color, outline_color=QColor
     painter.setPen(text_color)
     painter.drawText(x, y, text)
 
+def get_compute_mode_text(config):
+    """獲取運算模式文字，支援 ONNX 和 PyTorch 模型"""
+    model_path = getattr(config, 'model_path', '')
+    
+    # 檢查是否為 PyTorch 模型
+    if model_path.endswith('.pt'):
+        try:
+            import torch
+            # 檢查 CUDA 是否可用
+            if torch.cuda.is_available():
+                return get_text("gpu_cuda")  # 新增 CUDA GPU 文字
+            else:
+                return get_text("cpu")
+        except ImportError:
+            return get_text("cpu")
+    
+    # ONNX 模型邏輯
+    current_provider = getattr(config, 'current_provider', 'CPUExecutionProvider')
+    if "Dml" in current_provider:
+        return get_text("gpu_directml")
+    else:
+        return get_text("cpu")
+
 class StatusPanel(QWidget):
     """
     一個獨立的 PyQt6 視窗，用於在螢幕左上角顯示 Axiom 的 Logo 和運行狀態。
@@ -157,7 +180,8 @@ class StatusPanel(QWidget):
         draw_text_with_outline(painter, x_offset, y_offset, f"{get_text('auto_aim')}: {aim_status_text}", aim_color)
         y_offset += 20
         
-        provider_text = get_text("gpu_directml") if "Dml" in self.config.current_provider else get_text("cpu")
+        # 使用新的函數來獲取運算模式文字
+        provider_text = get_compute_mode_text(self.config)
         draw_text_with_outline(painter, x_offset, y_offset, f"{get_text('status_panel_compute_mode')}: {provider_text}", text_color)
         y_offset += 20
         

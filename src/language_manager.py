@@ -35,6 +35,7 @@ class LanguageManager:
                 "compute_mode": "運算模式",
                 "cpu": "CPU",
                 "gpu_directml": "DirectML (GPU)",
+                "gpu_cuda": "CUDA (GPU)",
                 "toggle_auto_aim": "自動瞄準開關",
                 "exit_and_save": "退出並保存",
                 
@@ -45,8 +46,7 @@ class LanguageManager:
                 "show_boxes": "顯示人物框",
                 "keep_detecting": "保持檢測 (即使未按瞄準鍵)",
                 "fov_follow_mouse": "FOV跟隨鼠標",
-                "enable_anti_recoil": "啟用防後座力 (自動關閉FOV跟隨)",
-                "anti_recoil_speed": "防後座力速度",
+
                 
                 # ***** 新增：音效提示系統 *****
                 "sound_alert_system": "音效提示系統",
@@ -112,6 +112,13 @@ class LanguageManager:
                 # 捐款
                 "donate": "捐款",
                 "donate_en": "Donate",
+                
+                # 高級/簡單模式切換
+                "advanced_mode": "高級模式",
+                "simple_mode": "簡單模式",
+                "mode_switch_tooltip": "切換高級/簡單模式\n高級模式：完整功能\n簡單模式：簡化操作",
+                "unified_xy_speed": "統一 X/Y 軸速度",
+                "unified_speed_tooltip": "同時調整水平和垂直軸的瞄準速度",
                 
                 # 設定檔相關
                 "config_saved": "設定已儲存",
@@ -201,6 +208,7 @@ class LanguageManager:
                 "compute_mode": "Compute Mode",
                 "cpu": "CPU",
                 "gpu_directml": "DirectML (GPU)",
+                "gpu_cuda": "CUDA (GPU)",
                 "toggle_auto_aim": "Toggle Auto Aim",
                 "exit_and_save": "Exit & Save",
                 
@@ -211,8 +219,7 @@ class LanguageManager:
                 "show_boxes": "Show Player Boxes",
                 "keep_detecting": "Keep Detecting (Even Without Aim Key)",
                 "fov_follow_mouse": "FOV Follow Mouse",
-                "enable_anti_recoil": "Enable Anti-Recoil (Auto Disable FOV Follow)",
-                "anti_recoil_speed": "Anti-Recoil Speed",
+
                 
                 # ***** 新增：音效提示系統 *****
                 "sound_alert_system": "Sound Alert System",
@@ -278,6 +285,13 @@ class LanguageManager:
                 # Donate
                 "donate": "Donate",
                 "donate_en": "Donate",
+                
+                # Advanced/Simple mode toggle
+                "advanced_mode": "Advanced Mode",
+                "simple_mode": "Simple Mode",
+                "mode_switch_tooltip": "Toggle Advanced/Simple Mode\nAdvanced: Full features\nSimple: Simplified operation",
+                "unified_xy_speed": "Unified X/Y Speed",
+                "unified_speed_tooltip": "Adjust horizontal and vertical aim speed together",
                 
                 # Config related
                 "config_saved": "Configuration Saved",
