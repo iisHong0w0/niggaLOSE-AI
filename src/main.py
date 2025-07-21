@@ -398,8 +398,7 @@ def auto_fire_loop(config, boxes_queue):
     last_box_update = 0
     
     # 優化參數 - 根據檢測間隔調整
-    BOX_UPDATE_INTERVAL = max(0.005, config.detect_interval)  # 更積極的更新間隔
-    KEY_CHECK_INTERVAL = 0.001  # 進一步降低按鍵檢查間隔
+    BOX_UPDATE_INTERVAL = 1 / 60  # ***** 修改：與主迴圈同步更新頻率 *****
     
     # 修復：動態更新按鍵配置
     auto_fire_key = config.auto_fire_key
@@ -506,12 +505,8 @@ def auto_fire_loop(config, boxes_queue):
 
         last_key_state = key_state
         
-        # 優化：動態睡眠時間，在性能模式下進一步優化
-        if getattr(config, 'performance_mode', False):
-            sleep_time = KEY_CHECK_INTERVAL if key_state else 0.002  # 性能模式下更短的睡眠時間
-        else:
-            sleep_time = KEY_CHECK_INTERVAL if key_state else 0.008
-        time.sleep(sleep_time)
+        # ***** 修改：將此迴圈的休眠時間固定為 1/60 秒，與主迴圈同步 *****
+        time.sleep(1 / 60)
 
 
 

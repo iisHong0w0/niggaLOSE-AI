@@ -71,7 +71,7 @@ class Config:
         self.mouse_move_method = "delayed"  # 固定使用mouse_event
 
         # 優化：調整檢測間隔為更合理的值，平衡性能和響應速度
-        self.detect_interval = 0.001  # 1ms間隔，極高響應速度 (優化CPU性能)
+        self.detect_interval = 1 / 60  # ***** 修改：將檢測間隔設定為每秒 60 次 *****
         self.aim_toggle_key = 45  # Insert 鍵
         self.auto_fire_key2 = 0x04  # 滑鼠中鍵
         

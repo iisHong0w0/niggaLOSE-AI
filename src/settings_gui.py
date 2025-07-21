@@ -283,52 +283,8 @@ class SettingsWindow:
                                                selectcolor=self.bg_main, 
                                                font=("Arial", 10))
         single_target_checkbox.pack(anchor="w", pady=(5, 0))
-        
-        # ***** 新增：CPU性能優化設定 *****
-        cpu_frame = create_section_frame(tab, "CPU 性能優化")
-        cpu_frame.pack(fill="x", pady=(15, 0))
-        
-        self.cpu_optimization_var = tk.BooleanVar(value=getattr(self.config, 'cpu_optimization', True))
-        cpu_opt_checkbox = tk.Checkbutton(cpu_frame, 
-                                         text="啟用 CPU 性能優化", 
-                                         variable=self.cpu_optimization_var, 
-                                         command=self.toggle_cpu_optimization, 
-                                         bg=self.bg_frame, 
-                                         fg=self.fg_text, 
-                                         selectcolor=self.bg_main, 
-                                         font=("Arial", 10))
-        cpu_opt_checkbox.pack(anchor="w", pady=(5, 0))
-        
-        # 進程優先級設定
-        priority_frame = tk.Frame(cpu_frame, bg=self.bg_frame)
-        priority_frame.pack(fill="x", pady=(5, 0))
-        
-        tk.Label(priority_frame, text="進程優先級:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10)).pack(side="left")
-        
-        self.process_priority_var = tk.StringVar(value=getattr(self.config, 'process_priority', 'high'))
-        process_priority_menu = ttk.Combobox(priority_frame, 
-                                           textvariable=self.process_priority_var, 
-                                           values=["normal", "high", "realtime"], 
-                                           state="readonly", 
-                                           width=10)
-        process_priority_menu.pack(side="left", padx=(10, 0))
-        process_priority_menu.bind("<<ComboboxSelected>>", self.on_process_priority_change)
-        
-        # 線程優先級設定
-        thread_priority_frame = tk.Frame(cpu_frame, bg=self.bg_frame)
-        thread_priority_frame.pack(fill="x", pady=(5, 0))
-        
-        tk.Label(thread_priority_frame, text="線程優先級:", bg=self.bg_frame, fg=self.fg_text, font=("Arial", 10)).pack(side="left")
-        
-        self.thread_priority_var = tk.StringVar(value=getattr(self.config, 'thread_priority', 'high'))
-        thread_priority_menu = ttk.Combobox(thread_priority_frame, 
-                                          textvariable=self.thread_priority_var, 
-                                          values=["normal", "high", "realtime"], 
-                                          state="readonly", 
-                                          width=10)
-        thread_priority_menu.pack(side="left", padx=(10, 0))
-        thread_priority_menu.bind("<<ComboboxSelected>>", self.on_thread_priority_change)
-    
+        # 移除 CPU 性能優化區塊
+
     def create_aim_control_tab(self, notebook):
         """建立瞄準控制分頁"""
         tab = tk.Frame(notebook, bg=self.bg_main, padx=20, pady=15)
@@ -1072,47 +1028,6 @@ class SettingsWindow:
         """切換音效提示"""
         self.config.enable_sound_alert = self.enable_sound_alert_var.get()
     
-    def toggle_cpu_optimization(self):
-        """切換CPU性能優化"""
-        self.config.cpu_optimization = self.cpu_optimization_var.get()
-        if self.config.cpu_optimization:
-            print("[設定] CPU性能優化已啟用")
-        else:
-            print("[設定] CPU性能優化已停用")
-    
-    def on_process_priority_change(self, event=None):
-        """進程優先級變更"""
-        self.config.process_priority = self.process_priority_var.get()
-        print(f"[設定] 進程優先級設定為：{self.config.process_priority}")
-    
-    def on_thread_priority_change(self, event=None):
-        """線程優先級變更"""
-        self.config.thread_priority = self.thread_priority_var.get()
-        print(f"[設定] 線程優先級設定為：{self.config.thread_priority}")
-
-    def get_compute_mode_text(self):
-        """獲取運算模式文字，支援 ONNX 和 PyTorch 模型"""
-        model_path = getattr(self.config, 'model_path', '')
-        
-        # 檢查是否為 PyTorch 模型
-        if model_path.endswith('.pt'):
-            try:
-                import torch
-                # 檢查 CUDA 是否可用
-                if torch.cuda.is_available():
-                    return get_text("gpu_cuda")  # 新增 CUDA GPU 文字
-                else:
-                    return get_text("cpu")
-            except ImportError:
-                return get_text("cpu")
-        
-        # ONNX 模型邏輯
-        current_provider = getattr(self.config, 'current_provider', 'CPUExecutionProvider')
-        if "Dml" in current_provider:
-            return get_text("gpu_directml")
-        else:
-            return get_text("cpu")
-
     def open_preset_manager(self):
         """打開預設管理器（向後兼容）"""
         # 這個方法保留是為了向後兼容，但現在會切換到預設管理標籤頁
@@ -1386,6 +1301,18 @@ class SettingsWindow:
                 messagebox.showinfo("成功", f"預設 '{preset_name}' 匯出成功!")
             else:
                 messagebox.showerror("錯誤", "匯出預設失敗!")
+
+    def get_compute_mode_text(self):
+        """取得目前運算模式文字（如 CPU/GPU）"""
+        provider = getattr(self.config, 'current_provider', 'CPUExecutionProvider')
+        if provider == 'CPUExecutionProvider':
+            return 'CPU'
+        elif provider == 'CUDAExecutionProvider':
+            return 'GPU (CUDA)'
+        elif provider == 'DmlExecutionProvider':
+            return 'GPU (DirectML)'
+        else:
+            return str(provider)
 
 def create_settings_gui(config, start_ai_threads=None):
     root = tk.Tk()
